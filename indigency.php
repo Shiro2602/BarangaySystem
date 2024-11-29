@@ -1,4 +1,5 @@
 <?php
+require_once 'auth_check.php';
 require_once 'config.php';
 
 // Handle indigency request submission
@@ -34,6 +35,7 @@ $residents = $stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="css/print.css" rel="stylesheet">
     <style>
         .sidebar {
             height: 100vh;
@@ -114,12 +116,12 @@ $residents = $stmt->fetchAll();
                         </thead>
                         <tbody>
                             <?php foreach ($certificates as $cert): ?>
-                            <tr>
+                            <tr data-id="<?= $cert['id'] ?>">
                                 <td><?= $cert['id'] ?></td>
-                                <td><?= $cert['resident_name'] ?></td>
-                                <td><?= $cert['purpose'] ?></td>
-                                <td><?= $cert['issue_date'] ?></td>
-                                <td><?= $cert['or_number'] ?></td>
+                                <td class="resident-name"><?= $cert['resident_name'] ?></td>
+                                <td class="purpose"><?= $cert['purpose'] ?></td>
+                                <td class="issue-date"><?= $cert['issue_date'] ?></td>
+                                <td class="or-number"><?= $cert['or_number'] ?></td>
                                 <td>
                                     <span class="badge bg-<?= $cert['status'] == 'Approved' ? 'success' : 
                                         ($cert['status'] == 'Rejected' ? 'danger' : 'warning') ?>">
@@ -184,32 +186,30 @@ $residents = $stmt->fetchAll();
     </div>
 
     <!-- Print Template (Hidden) -->
-    <div class="print-certificate">
-        <div class="text-center">
+    <div id="certificateTemplate" class="print-certificate">
+        <div class="certificate-header">
             <h4>Republic of the Philippines</h4>
             <h5>Province of _______________</h5>
             <h5>Municipality of _______________</h5>
-            <h3>OFFICE OF THE BARANGAY CHAIRMAN</h3>
-            <h2 class="mt-5">CERTIFICATE OF INDIGENCY</h2>
+            <h4 class="mt-4">OFFICE OF THE BARANGAY CHAIRMAN</h4>
+            <h3 class="mt-4">CERTIFICATE OF INDIGENCY</h3>
         </div>
-        <div class="content mt-5">
-            <p>TO WHOM IT MAY CONCERN:</p>
-            <p class="mt-4">This is to certify that <span id="resident_name" class="fw-bold">_______________</span>, 
-               of legal age, <span id="civil_status">single</span>, Filipino Citizen is a bonafide resident of this 
-               Barangay and belongs to the indigent family in this Barangay.</p>
-            <p>This certification is being issued upon the request of the above-named person for 
-               <span id="purpose" class="fw-bold">_______________</span> purposes.</p>
-            <p>Issued this <span id="issue_date">_______________</span> at the Barangay Hall, 
-               <span id="barangay_name">_______________</span>.</p>
+        
+        <div class="certificate-body">
+            <p class="mb-4">TO WHOM IT MAY CONCERN:</p>
+            
+            <p>This is to certify that <span class="resident-name">_______________</span>, of legal age, Filipino Citizen is a bonafide resident of this Barangay and belongs to the indigent family in this Barangay.</p>
+            
+            <p>This certification is being issued upon the request of the above-named person for <span class="purpose">_______________</span> purposes.</p>
+            
+            <p>Issued this <span class="issue-date">_______________</span> at the Barangay Hall, _______________.</p>
+            
+            <p class="mb-4">OR No.: <span class="or-number">_______________</span></p>
         </div>
-        <div class="row mt-5">
-            <div class="col-6">
-                <p>OR No.: <span id="or_number">_______________</span></p>
-                <p>Date Issued: <span id="date_issued">_______________</span></p>
-            </div>
-            <div class="col-6 text-center">
-                <p class="mt-5">_______________________</p>
-                <p>Barangay Chairman</p>
+        
+        <div class="certificate-footer">
+            <div class="signature-line">
+                Barangay Chairman
             </div>
         </div>
     </div>
@@ -224,8 +224,17 @@ $residents = $stmt->fetchAll();
         });
 
         function printIndigency(id) {
-            // In a real implementation, you would fetch the indigency details via AJAX
-            // and populate the print template before printing
+            // Get indigency data from the table row
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (!row) return;
+            
+            // Update certificate template with data
+            document.querySelector('.resident-name').textContent = row.querySelector('.resident-name').textContent;
+            document.querySelector('.purpose').textContent = row.querySelector('.purpose').textContent;
+            document.querySelector('.issue-date').textContent = new Date(row.querySelector('.issue-date').textContent).toLocaleDateString();
+            document.querySelector('.or-number').textContent = row.querySelector('.or-number').textContent;
+            
+            // Print the certificate
             window.print();
         }
     </script>

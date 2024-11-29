@@ -1,13 +1,13 @@
 <?php
 require_once 'config.php';
 require_once 'auth.php';
+require_once 'auth_check.php';
 
 $forecast_result = null;
 $error_message = null;
 $debug_info = '';
 
 if (isset($_POST['submit_forecast'])) {
-    // Handle file upload
     $target_dir = "uploads/";
     if (!file_exists($target_dir)) {
         mkdir($target_dir, 0777, true);
@@ -17,17 +17,14 @@ if (isset($_POST['submit_forecast'])) {
     $uploadOk = 1;
     $fileType = strtolower(pathinfo($target_file,PATHINFO_EXTENSION));
 
-    // Check if file is a CSV
     if($fileType != "csv") {
         $error_message = "Sorry, only CSV files are allowed.";
         $uploadOk = 0;
     }
 
     if ($uploadOk && move_uploaded_file($_FILES["population_data"]["tmp_name"], $target_file)) {
-        // Execute Python script
         $forecast_years = $_POST['forecast_years'] ?? 5;
         
-        // Use full path to Python executable
         $python_path = '"C:\\Users\\Encarnacion\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"';
         $script_path = realpath("scripts/population_forecast.py");
         $data_path = realpath($target_file);
@@ -52,7 +49,6 @@ if (isset($_POST['submit_forecast'])) {
             $error_message = "Error executing the forecast script.";
             $debug_info .= "Shell exec returned null\n";
             
-            // Additional error checking
             if (!file_exists($script_path)) {
                 $debug_info .= "Script file not found at: $script_path\n";
             }
@@ -61,7 +57,6 @@ if (isset($_POST['submit_forecast'])) {
             }
         }
 
-        // Clean up uploaded file
         if (file_exists($target_file)) {
             unlink($target_file);
         }
@@ -251,16 +246,12 @@ if (isset($_POST['submit_forecast'])) {
     
     <?php if ($forecast_result && !isset($forecast_result['error'])): ?>
     <script>
-        // Prepare data for the chart
         const historicalData = <?php echo json_encode($forecast_result['historical']); ?>;
         const forecastData = <?php echo json_encode($forecast_result['forecast']); ?>;
 
-        // Create datasets
         const labels = [...historicalData.map(d => d.year), ...forecastData.map(d => d.year)];
         const historicalValues = [...historicalData.map(d => d.population), ...Array(forecastData.length).fill(null)];
         const forecastValues = [...Array(historicalData.length).fill(null), ...forecastData.map(d => d.population)];
-
-        // Create the chart
         const ctx = document.getElementById('forecastChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',

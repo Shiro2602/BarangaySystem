@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'auth_check.php';
 
 // Add Resident
 if (isset($_POST['add_resident'])) {
