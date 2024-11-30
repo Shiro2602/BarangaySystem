@@ -45,6 +45,9 @@ require_once 'auth.php';
                     <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
                     <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
                     <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
+                    <?php endif; ?>
                     <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
                 </nav>
             </div>

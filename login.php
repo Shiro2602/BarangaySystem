@@ -13,43 +13,17 @@ if (isset($_SESSION['authenticated']) && $_SESSION['authenticated']) {
 $error_message = '';
 $success_message = '';
 
-// Handle Create Account
-if (isset($_POST['create_account'])) {
-    $username = $_POST['new_username'];
-    $password = $_POST['new_password'];
-    $confirm_password = $_POST['confirm_password'];
-    
-    if ($password !== $confirm_password) {
-        $error_message = "Passwords do not match!";
-    } else {
-        try {
-            // Check if username already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->execute([$username]);
-            if ($stmt->rowCount() > 0) {
-                $error_message = "Username already exists!";
-            } else {
-                // Create new account
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')");
-                $stmt->execute([$username, $hashed_password]);
-                $success_message = "Account created successfully! You can now login.";
-            }
-        } catch (PDOException $e) {
-            $error_message = "Database error: " . $e->getMessage();
-        }
-    }
-}
-
 // Handle Login
 if (isset($_POST['login'])) {
     $username = $_POST['username'];
     $password = $_POST['password'];
 
     try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
+        $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result->fetch_assoc();
 
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
@@ -61,7 +35,7 @@ if (isset($_POST['login'])) {
         } else {
             $error_message = "Invalid username or password!";
         }
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         $error_message = "Database error: " . $e->getMessage();
     }
 }
@@ -109,27 +83,9 @@ if (isset($_POST['login'])) {
                 </div>
                 <button type="submit" name="login" class="btn btn-primary w-100">Login</button>
             </form>
-
-            <hr>
-
-            <!-- Create Account Form -->
-            <form method="POST">
-                <h3 class="text-center mb-4">Create Account</h3>
-                <div class="mb-3">
-                    <label for="new_username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="new_username" name="new_username" required>
-                </div>
-                <div class="mb-3">
-                    <label for="new_password" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="new_password" name="new_password" required>
-                </div>
-                <div class="mb-3">
-                    <label for="confirm_password" class="form-label">Confirm Password</label>
-                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                </div>
-                <button type="submit" name="create_account" class="btn btn-success w-100">Create Account</button>
-            </form>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

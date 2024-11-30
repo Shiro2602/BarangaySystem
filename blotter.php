@@ -4,33 +4,36 @@ require_once 'config.php';
 
 // Handle blotter record submission
 if (isset($_POST['submit_blotter'])) {
-    $stmt = $pdo->prepare("INSERT INTO blotter (complainant_id, respondent_id, incident_type, incident_date, 
+    $stmt = $conn->prepare("INSERT INTO blotter (complainant_id, respondent_id, incident_type, incident_date, 
                           incident_location, incident_details) 
                           VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
+    $stmt->bind_param("iisssss",
         $_POST['complainant_id'],
         $_POST['respondent_id'],
         $_POST['incident_type'],
         $_POST['incident_date'],
         $_POST['incident_location'],
         $_POST['incident_details']
-    ]);
+    );
+    $stmt->execute();
 }
 
 // Get all blotter records
-$stmt = $pdo->query("SELECT b.*, 
+$query = "SELECT b.*, 
                      CONCAT(c.last_name, ', ', c.first_name) as complainant_name,
                      CONCAT(r.last_name, ', ', r.first_name) as respondent_name
                      FROM blotter b 
                      JOIN residents c ON b.complainant_id = c.id 
                      JOIN residents r ON b.respondent_id = r.id 
-                     ORDER BY b.created_at DESC");
-$blotters = $stmt->fetchAll();
+                     ORDER BY b.created_at DESC";
+$result = $conn->query($query);
+$blotters = $result->fetch_all(MYSQLI_ASSOC);
 
 // Get residents for dropdown
-$stmt = $pdo->query("SELECT id, CONCAT(last_name, ', ', first_name, ' ', middle_name) as full_name 
-                     FROM residents ORDER BY last_name, first_name");
-$residents = $stmt->fetchAll();
+$query = "SELECT id, CONCAT(last_name, ', ', first_name, ' ', middle_name) as full_name 
+                     FROM residents ORDER BY last_name, first_name";
+$result = $conn->query($query);
+$residents = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -76,6 +79,11 @@ $residents = $stmt->fetchAll();
                     <a href="blotter.php" class="active"><i class="fas fa-book me-2"></i> Blotter</a>
                     <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
                     <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
+                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
+                    <?php endif; ?>
+                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
                 </nav>
             </div>
 

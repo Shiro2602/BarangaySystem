@@ -1,30 +1,68 @@
 <?php
-require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'auth_check.php';
 
-// Handle clearance request submission
-if (isset($_POST['request_clearance'])) {
-    $stmt = $pdo->prepare("INSERT INTO clearances (resident_id, purpose, issue_date, expiry_date, or_number, amount) 
-                          VALUES (?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 6 MONTH), ?, ?)");
-    $stmt->execute([
+// Add Clearance
+if (isset($_POST['add_clearance'])) {
+    $stmt = $conn->prepare("INSERT INTO clearances (resident_id, purpose, issue_date, expiry_date, or_number, amount, status) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("issssds",
         $_POST['resident_id'],
         $_POST['purpose'],
+        $_POST['issue_date'],
+        $_POST['expiry_date'],
         $_POST['or_number'],
-        $_POST['amount']
-    ]);
+        $_POST['amount'],
+        $_POST['status']
+    );
+    $stmt->execute();
 }
 
-// Get all clearance requests
-$stmt = $pdo->query("SELECT c.*, CONCAT(r.last_name, ', ', r.first_name, ' ', r.middle_name) as resident_name 
-                     FROM clearances c 
-                     JOIN residents r ON c.resident_id = r.id 
-                     ORDER BY c.issue_date DESC");
-$clearances = $stmt->fetchAll();
+// Edit Clearance
+if (isset($_POST['edit_clearance'])) {
+    $stmt = $conn->prepare("UPDATE clearances SET 
+        resident_id = ?, 
+        purpose = ?, 
+        issue_date = ?, 
+        expiry_date = ?, 
+        or_number = ?, 
+        amount = ?, 
+        status = ? 
+        WHERE id = ?");
+    $stmt->bind_param("issssdsi",
+        $_POST['resident_id'],
+        $_POST['purpose'],
+        $_POST['issue_date'],
+        $_POST['expiry_date'],
+        $_POST['or_number'],
+        $_POST['amount'],
+        $_POST['status'],
+        $_POST['clearance_id']
+    );
+    $stmt->execute();
+}
 
-// Get residents for dropdown
-$stmt = $pdo->query("SELECT id, CONCAT(last_name, ', ', first_name, ' ', middle_name) as full_name 
-                     FROM residents ORDER BY last_name, first_name");
-$residents = $stmt->fetchAll();
+// Delete Clearance
+if (isset($_POST['delete_clearance'])) {
+    $stmt = $conn->prepare("DELETE FROM clearances WHERE id = ?");
+    $stmt->bind_param("i", $_POST['clearance_id']);
+    $stmt->execute();
+}
+
+// Get all clearances with resident information
+$query = "SELECT c.*, CONCAT(r.first_name, ' ', r.last_name) as resident_name 
+          FROM clearances c 
+          LEFT JOIN residents r ON c.resident_id = r.id 
+          ORDER BY c.issue_date DESC";
+$result = $conn->query($query);
+$clearances = $result->fetch_all(MYSQLI_ASSOC);
+
+// Get all residents for the dropdown
+$residents_query = "SELECT id, CONCAT(first_name, ' ', last_name) as full_name 
+                   FROM residents 
+                   ORDER BY last_name, first_name";
+$residents_result = $conn->query($residents_query);
+$residents = $residents_result->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -87,6 +125,11 @@ $residents = $stmt->fetchAll();
                     <a href="blotter.php"><i class="fas fa-book me-2"></i> Blotter</a>
                     <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
                     <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
+                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
+                    <?php endif; ?>
+                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
                 </nav>
             </div>
 
@@ -134,14 +177,14 @@ $residents = $stmt->fetchAll();
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-success" onclick="printClearance(<?= $clearance['id'] ?>)" title="Print">
+                                    <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-success print-clearance" data-id="<?= $clearance['id'] ?>" title="Print">
                                         <i class="fas fa-print"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-info" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-warning" title="Edit">
-                                        <i class="fas fa-edit"></i>
+                                    <button class="btn btn-sm btn-danger delete-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteClearanceModal" title="Delete">
+                                        <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -184,10 +227,159 @@ $residents = $stmt->fetchAll();
                             <label>Amount</label>
                             <input type="number" name="amount" class="form-control" step="0.01" required>
                         </div>
+                        <div class="mb-3">
+                            <label>Status</label>
+                            <select name="status" class="form-control" required>
+                                <option value="Pending">Pending</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>Issue Date</label>
+                            <input type="date" name="issue_date" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Expiry Date</label>
+                            <input type="date" name="expiry_date" class="form-control" required>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" name="request_clearance" class="btn btn-primary">Submit Request</button>
+                        <button type="submit" name="add_clearance" class="btn btn-primary">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Clearance Modal -->
+    <div class="modal fade" id="viewClearanceModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">View Clearance Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label>Resident</label>
+                            <input type="text" id="view_resident_name" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label>Purpose</label>
+                            <input type="text" id="view_purpose" class="form-control" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label>Issue Date</label>
+                            <input type="date" id="view_issue_date" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label>Expiry Date</label>
+                            <input type="date" id="view_expiry_date" class="form-control" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label>OR Number</label>
+                            <input type="text" id="view_or_number" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label>Amount</label>
+                            <input type="number" id="view_amount" class="form-control" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label>Status</label>
+                        <input type="text" id="view_status" class="form-control" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Clearance Modal -->
+    <div class="modal fade" id="editClearanceModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Clearance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <input type="hidden" name="clearance_id" id="edit_clearance_id">
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Resident</label>
+                                <select name="resident_id" id="edit_resident_id" class="form-control" required>
+                                    <?php foreach ($residents as $resident): ?>
+                                        <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Purpose</label>
+                                <input type="text" name="purpose" id="edit_purpose" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Issue Date</label>
+                                <input type="date" name="issue_date" id="edit_issue_date" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Expiry Date</label>
+                                <input type="date" name="expiry_date" id="edit_expiry_date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>OR Number</label>
+                                <input type="text" name="or_number" id="edit_or_number" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Amount</label>
+                                <input type="number" name="amount" id="edit_amount" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Status</label>
+                            <select name="status" id="edit_status" class="form-control" required>
+                                <option value="Pending">Pending</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" name="edit_clearance" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Clearance Modal -->
+    <div class="modal fade" id="deleteClearanceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Clearance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <input type="hidden" name="clearance_id" id="delete_clearance_id">
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete this clearance? This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="delete_clearance" class="btn btn-danger">Delete</button>
                     </div>
                 </form>
             </div>
@@ -233,29 +425,72 @@ $residents = $stmt->fetchAll();
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('#clearanceTable').DataTable({
-                "pageLength": 10,
-                "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                "searching": true,
-                "ordering": true,
-                "info": true,
-                "responsive": true
+            // Initialize DataTable
+            var table = $('#clearanceTable').DataTable();
+
+            // View Clearance
+            $('.view-clearance').click(function() {
+                var id = $(this).data('id');
+                var row = $(this).closest('tr');
+                var clearance = <?php echo json_encode($clearances); ?>.find(c => c.id == id);
+                
+                if (clearance) {
+                    $('#view_resident_name').val(clearance.resident_name);
+                    $('#view_purpose').val(clearance.purpose);
+                    $('#view_issue_date').val(clearance.issue_date);
+                    $('#view_expiry_date').val(clearance.expiry_date);
+                    $('#view_or_number').val(clearance.or_number);
+                    $('#view_amount').val(clearance.amount);
+                    $('#view_status').val(clearance.status);
+                }
+            });
+
+            // Edit Clearance
+            $('.edit-clearance').click(function() {
+                var id = $(this).data('id');
+                var row = $(this).closest('tr');
+                var clearance = <?php echo json_encode($clearances); ?>.find(c => c.id == id);
+                
+                if (clearance) {
+                    $('#edit_clearance_id').val(clearance.id);
+                    $('#edit_resident_id').val(clearance.resident_id);
+                    $('#edit_purpose').val(clearance.purpose);
+                    $('#edit_issue_date').val(clearance.issue_date);
+                    $('#edit_expiry_date').val(clearance.expiry_date);
+                    $('#edit_or_number').val(clearance.or_number);
+                    $('#edit_amount').val(clearance.amount);
+                    $('#edit_status').val(clearance.status);
+                }
+            });
+
+            // Delete Clearance
+            $('.delete-clearance').click(function() {
+                var id = $(this).data('id');
+                $('#delete_clearance_id').val(id);
+            });
+
+            // Print Clearance
+            $('.print-clearance').click(function() {
+                var row = $(this).closest('tr');
+                
+                // Get the data from the row
+                var residentName = row.find('td:eq(1)').text().trim();
+                var purpose = row.find('td:eq(2)').text().trim();
+                var issueDate = new Date(row.find('td:eq(3)').text().trim()).toLocaleDateString();
+                var orNumber = row.find('td:eq(5)').text().trim();
+                var amount = row.find('td:eq(6)').text().trim();
+
+                // Update the certificate template
+                $('#print-resident-name').text(residentName);
+                $('#print-purpose').text(purpose);
+                $('#print-issue-date').text(issueDate);
+                $('#print-or-number').text(orNumber);
+                $('#print-amount').text(amount);
+
+                // Print
+                window.print();
             });
         });
-
-        function printClearance(id) {
-            const row = document.querySelector(`tr[data-id="${id}"]`);
-            if (!row) return;
-            
-            // Update certificate template with data
-            document.querySelector('#print-resident-name').textContent = row.querySelector('.resident-name').textContent;
-            document.querySelector('#print-purpose').textContent = row.querySelector('.purpose').textContent;
-            document.querySelector('#print-issue-date').textContent = new Date(row.querySelector('.issue-date').textContent).toLocaleDateString();
-            document.querySelector('#print-or-number').textContent = row.querySelector('.or-number').textContent;
-            
-            // Print the certificate
-            window.print();
-        }
     </script>
 </body>
 </html>

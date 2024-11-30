@@ -8,9 +8,11 @@ $error_message = '';
 
 // Get current user data
 $user_id = $_SESSION['user_id'];
-$stmt = $pdo->prepare("SELECT username, email FROM users WHERE id = ?");
-$stmt->execute([$user_id]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_profile'])) {
@@ -21,15 +23,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $confirm_password = trim($_POST['confirm_password']);
 
         // Verify current password
-        $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
-        $stmt->execute([$user_id]);
-        $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user_data = $result->fetch_assoc();
 
         if (password_verify($current_password, $user_data['password'])) {
             // Check if username is already taken by another user
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
-            $stmt->execute([$username, $user_id]);
-            if ($stmt->rowCount() > 0) {
+            $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+            $stmt->bind_param("si", $username, $user_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows > 0) {
                 $error_message = "Username is already taken.";
             } else {
                 // Update profile
@@ -42,13 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         // Update with new password
                         $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                        $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?");
-                        $success = $stmt->execute([$username, $email, $hashed_password, $user_id]);
+                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?");
+                        $stmt->bind_param("sssi", $username, $email, $hashed_password, $user_id);
+                        $success = $stmt->execute();
                     }
                 } else {
                     // Update without changing password
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ? WHERE id = ?");
-                    $success = $stmt->execute([$username, $email, $user_id]);
+                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ? WHERE id = ?");
+                    $stmt->bind_param("ssi", $username, $email, $user_id);
+                    $success = $stmt->execute();
                 }
 
                 if (!$error_message) {

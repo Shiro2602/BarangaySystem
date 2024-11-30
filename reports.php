@@ -4,30 +4,38 @@ require_once 'auth_check.php';
 
 // Get summary statistics
 $stats = [
-    'residents' => $pdo->query("SELECT COUNT(*) FROM residents")->fetchColumn(),
-    'clearances' => $pdo->query("SELECT COUNT(*) FROM clearances WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetchColumn(),
-    'indigency' => $pdo->query("SELECT COUNT(*) FROM indigency WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetchColumn(),
-    'blotters' => $pdo->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetchColumn()
+    'residents' => $conn->query("SELECT COUNT(*) FROM residents")->fetch_row()[0],
+    'clearances' => $conn->query("SELECT COUNT(*) FROM clearances WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
+    'indigency' => $conn->query("SELECT COUNT(*) FROM indigency WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
+    'blotters' => $conn->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetch_row()[0]
 ];
 
 // Get monthly clearance revenue
-$monthlyRevenue = $pdo->query("SELECT 
+$monthlyRevenue = [];
+$result = $conn->query("SELECT 
     DATE_FORMAT(issue_date, '%Y-%m') as month,
     COUNT(*) as count,
     SUM(amount) as total
     FROM clearances 
     WHERE issue_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
     GROUP BY DATE_FORMAT(issue_date, '%Y-%m')
-    ORDER BY month DESC")->fetchAll();
+    ORDER BY month DESC");
+while ($row = $result->fetch_assoc()) {
+    $monthlyRevenue[] = $row;
+}
 
 // Get recent blotter cases
-$recentBlotters = $pdo->query("SELECT b.*, 
+$recentBlotters = [];
+$result = $conn->query("SELECT b.*, 
     CONCAT(c.first_name, ' ', c.last_name) as complainant,
     CONCAT(r.first_name, ' ', r.last_name) as respondent
     FROM blotter b
     JOIN residents c ON b.complainant_id = c.id
     JOIN residents r ON b.respondent_id = r.id
-    ORDER BY b.created_at DESC LIMIT 5")->fetchAll();
+    ORDER BY b.created_at DESC LIMIT 5");
+while ($row = $result->fetch_assoc()) {
+    $recentBlotters[] = $row;
+}
 ?>
 
 <!DOCTYPE html>
@@ -81,6 +89,11 @@ $recentBlotters = $pdo->query("SELECT b.*,
                     <a href="blotter.php"><i class="fas fa-book me-2"></i> Blotter</a>
                     <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
                     <a href="reports.php" class="active"><i class="fas fa-chart-bar me-2"></i> Reports</a>
+                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
+                    <?php endif; ?>
+                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
                 </nav>
             </div>
 

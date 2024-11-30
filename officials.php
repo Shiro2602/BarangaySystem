@@ -4,21 +4,23 @@ require_once 'config.php';
 
 // Handle official submission
 if (isset($_POST['add_official'])) {
-    $stmt = $pdo->prepare("INSERT INTO officials (position, first_name, last_name, contact_number, term_start, term_end) 
+    $stmt = $conn->prepare("INSERT INTO officials (position, first_name, last_name, contact_number, term_start, term_end) 
                           VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
+    $stmt->bind_param("ssssss",
         $_POST['position'],
         $_POST['first_name'],
         $_POST['last_name'],
         $_POST['contact_number'],
         $_POST['term_start'],
         $_POST['term_end']
-    ]);
+    );
+    $stmt->execute();
 }
 
 // Get all active officials
-$stmt = $pdo->query("SELECT * FROM officials WHERE status = 'Active' ORDER BY position");
-$officials = $stmt->fetchAll();
+$query = "SELECT * FROM officials WHERE status = 'Active' ORDER BY position";
+$result = $conn->query($query);
+$officials = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -70,6 +72,11 @@ $officials = $stmt->fetchAll();
                     <a href="blotter.php"><i class="fas fa-book me-2"></i> Blotter</a>
                     <a href="officials.php" class="active"><i class="fas fa-user-tie me-2"></i> Officials</a>
                     <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
+                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
+                    <?php endif; ?>
+                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
                 </nav>
             </div>
 
