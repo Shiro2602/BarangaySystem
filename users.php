@@ -52,24 +52,7 @@ $result = $conn->query($query);
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar">
-                <h3 class="text-white text-center mb-4">Barangay System</h3>
-                <nav>
-                    <a href="index.php"><i class="fas fa-home me-2"></i> Dashboard</a>
-                    <a href="residents.php"><i class="fas fa-users me-2"></i> Residents</a>
-                    <a href="clearance.php"><i class="fas fa-file-alt me-2"></i> Clearance</a>
-                    <a href="indigency.php"><i class="fas fa-certificate me-2"></i> Indigency</a>
-                    <a href="blotter.php"><i class="fas fa-book me-2"></i> Blotter</a>
-                    <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
-                    <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
-                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
-                    <?php if ($_SESSION['role'] === 'admin'): ?>
-                    <a href="users.php" class="active"><i class="fas fa-user-shield me-2"></i> User Management</a>
-                    <?php endif; ?>
-                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
-                </nav>
-            </div>
+            <?php include 'includes/header.php'; ?>
 
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">

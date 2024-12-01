@@ -64,11 +64,9 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Certificate of Indigency - Barangay System</title>
+    <title>Indigency Certificates - Barangay Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <link href="css/print.css" rel="stylesheet">
     <style>
         .sidebar {
             height: 100vh;
@@ -88,70 +86,31 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
             padding: 20px;
         }
         @media print {
-            body > *:not(#certificateTemplate) {
-                display: none !important;
+            .no-print {
+                display: none;
             }
-            #certificateTemplate {
+            .print-certificate {
                 display: block !important;
             }
         }
         .print-certificate {
             display: none;
-            width: 8.5in;
-            height: 11in;
-            padding: 0.5in;
-            margin: auto;
-            border: 1px solid #ddd;
-        }
-        .certificate-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        .certificate-body {
-            margin: 2rem 0;
-        }
-        .certificate-footer {
-            margin-top: 4rem;
-            text-align: center;
-        }
-        .signature-line {
-            display: inline-block;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            min-width: 200px;
-            border-top: 1px solid #000;
         }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar no-print">
-                <h3 class="text-white text-center mb-4">Barangay System</h3>
-                <nav>
-                    <a href="index.php"><i class="fas fa-home me-2"></i> Dashboard</a>
-                    <a href="residents.php"><i class="fas fa-users me-2"></i> Residents</a>
-                    <a href="clearance.php"><i class="fas fa-file-alt me-2"></i> Clearance</a>
-                    <a href="indigency.php" class="active"><i class="fas fa-certificate me-2"></i> Indigency</a>
-                    <a href="blotter.php"><i class="fas fa-book me-2"></i> Blotter</a>
-                    <a href="officials.php"><i class="fas fa-user-tie me-2"></i> Officials</a>
-                    <a href="reports.php"><i class="fas fa-chart-bar me-2"></i> Reports</a>
-                    <a href="forecast.php"><i class="fas fa-chart-line me-2"></i> Population Forecast</a>
-                    <?php if ($_SESSION['role'] === 'admin'): ?>
-                    <a href="users.php"><i class="fas fa-user-shield me-2"></i> User Management</a>
-                    <?php endif; ?>
-                    <a href="account.php"><i class="fas fa-user-cog me-2"></i> Account Settings</a>
-                </nav>
-            </div>
+            <?php include 'includes/header.php'; ?>
 
-            <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="row mb-4">
-                    <div class="col-12">
-                        <h2>Certificate of Indigency Management</h2>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addIndigencyModal">
-                            <i class="fas fa-plus"></i> Add Certificate
+                    <div class="col-md-6">
+                        <h2>Indigency Certificates</h2>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addIndigencyModal">
+                            <i class="fas fa-plus"></i> Add Indigency
                         </button>
                     </div>
                 </div>
