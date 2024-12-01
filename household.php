@@ -95,11 +95,19 @@ if (isset($_GET['id'])) {
                                                 <td><?php echo htmlspecialchars($row['address']); ?></td>
                                                 <td><?php echo $row['member_count']; ?></td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-info view-household" data-id="<?php echo $row['id']; ?>">
-                                                        <i class="bi bi-eye"></i> View
+                                                    <button type="button" class="btn btn-info btn-sm view-household" data-bs-toggle="modal" 
+                                                            data-bs-target="#viewHouseholdModal" data-id="<?php echo $row['id']; ?>">
+                                                        <i class="fas fa-eye"></i> View
                                                     </button>
-                                                    <button class="btn btn-sm btn-warning" onclick="editHousehold(<?php echo $row['id']; ?>)">
-                                                        <i class="bi bi-pencil"></i> Edit
+                                                    <button type="button" class="btn btn-warning btn-sm" 
+                                                            onclick="editHousehold(<?php echo $row['id']; ?>)">
+                                                        <i class="fas fa-edit"></i> Edit
+                                                    </button>
+                                                    <button type="button" class="btn btn-danger btn-sm delete-household" 
+                                                            data-bs-toggle="modal" data-bs-target="#deleteHouseholdModal" 
+                                                            data-id="<?php echo $row['id']; ?>"
+                                                            data-head="<?php echo htmlspecialchars($row['household_head']); ?>">
+                                                        <i class="fas fa-trash"></i> Delete
                                                     </button>
                                                 </td>
                                             </tr>
@@ -156,15 +164,16 @@ if (isset($_GET['id'])) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addHouseholdForm" action="household_process.php" method="POST">
+                    <form id="addHouseholdForm">
                         <div class="mb-3">
                             <label for="household_head" class="form-label">Household Head</label>
-                            <select class="form-select" name="household_head" required>
+                            <select class="form-select" name="household_head" id="household_head" required>
                                 <option value="">Select Household Head</option>
                                 <?php
-                                $residents_query = "SELECT id, first_name, last_name FROM residents WHERE household_id IS NULL";
-                                $residents_result = mysqli_query($conn, $residents_query);
-                                while ($resident = mysqli_fetch_assoc($residents_result)) {
+                                // Query for household head (only those without household)
+                                $head_query = "SELECT id, first_name, last_name FROM residents WHERE household_id IS NULL";
+                                $head_result = mysqli_query($conn, $head_query);
+                                while ($resident = mysqli_fetch_assoc($head_result)) {
                                     echo "<option value='" . $resident['id'] . "'>" . 
                                          htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']) . "</option>";
                                 }
@@ -172,10 +181,35 @@ if (isset($_GET['id'])) {
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="address" class="form-label">Address</label>
-                            <textarea class="form-control" name="address" required></textarea>
+                            <label for="household_members" class="form-label">Household Members</label>
+                            <select class="form-select" name="household_members[]" id="household_members" multiple>
+                                <?php
+                                // Query for members (all residents)
+                                $members_query = "SELECT id, first_name, last_name, 
+                                    CASE 
+                                        WHEN household_id IS NOT NULL THEN CONCAT(first_name, ' ', last_name, ' (Has Household)') 
+                                        ELSE CONCAT(first_name, ' ', last_name)
+                                    END as display_name 
+                                    FROM residents 
+                                    WHERE id != COALESCE((SELECT household_head_id FROM households WHERE id = household_id), 0)
+                                    ORDER BY household_id IS NULL DESC, first_name, last_name";
+                                $members_result = mysqli_query($conn, $members_query);
+                                while ($resident = mysqli_fetch_assoc($members_result)) {
+                                    echo "<option value='" . $resident['id'] . "'>" . 
+                                         htmlspecialchars($resident['display_name']) . "</option>";
+                                }
+                                ?>
+                            </select>
+                            <div class="form-text">Hold Ctrl (Windows) or Command (Mac) to select multiple members. Members marked with "(Has Household)" are already part of another household.</div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Save Household</button>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control" name="address" id="address" required></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Household</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -249,10 +283,104 @@ if (isset($_GET['id'])) {
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteHouseholdModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the household of <span id="deleteHouseholdHead"></span>?</p>
+                    <p class="text-danger">This will remove all household associations for its members.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
+            let deleteHouseholdId = null;
+
+            // Add Household Form Submission
+            $('#addHouseholdForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Disable the submit button to prevent double submission
+                const submitBtn = $(this).find('button[type="submit"]');
+                submitBtn.prop('disabled', true);
+                
+                // Get form data
+                const formData = new FormData(this);
+                const serializedData = {};
+                formData.forEach((value, key) => {
+                    if (serializedData[key]) {
+                        if (!Array.isArray(serializedData[key])) {
+                            serializedData[key] = [serializedData[key]];
+                        }
+                        serializedData[key].push(value);
+                    } else {
+                        serializedData[key] = value;
+                    }
+                });
+                
+                console.log('Sending data:', serializedData); // Debug log
+                
+                $.ajax({
+                    url: 'household_process.php',
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('Response received:', response); // Debug log
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            alert('Error creating household: ' + (response.message || 'Unknown error'));
+                            submitBtn.prop('disabled', false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Ajax error:', {
+                            status: status,
+                            error: error,
+                            responseText: xhr.responseText
+                        });
+                        
+                        let errorMessage = 'Error creating household. ';
+                        
+                        if (xhr.responseText) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                errorMessage += response.message || error || 'Please try again.';
+                            } catch (e) {
+                                console.error('Parse error:', e);
+                                console.log('Raw response:', xhr.responseText);
+                                errorMessage += 'Server response error. Please try again.';
+                            }
+                        } else {
+                            errorMessage += error || 'Please try again.';
+                        }
+                        
+                        alert(errorMessage);
+                        submitBtn.prop('disabled', false);
+                    }
+                });
+            });
+
+            // Clear form when modal is hidden
+            $('#addHouseholdModal').on('hidden.bs.modal', function() {
+                $('#addHouseholdForm')[0].reset();
+                $('#addHouseholdForm').find('button[type="submit"]').prop('disabled', false);
+            });
+
             // View Household Members
             $('.view-household').click(function() {
                 const householdId = $(this).data('id');
@@ -301,6 +429,74 @@ if (isset($_GET['id'])) {
                         $('#householdMembersBody').html('<tr><td colspan="6" class="text-center text-danger">Error loading members</td></tr>');
                     }
                 });
+            });
+
+            // Delete household button click
+            $('.delete-household').click(function() {
+                deleteHouseholdId = $(this).data('id');
+                const householdHead = $(this).data('head');
+                $('#deleteHouseholdHead').text(householdHead);
+            });
+
+            // Confirm delete button click
+            $('#confirmDelete').click(function() {
+                if (!deleteHouseholdId) {
+                    alert('No household selected for deletion');
+                    return;
+                }
+
+                const btn = $(this);
+                btn.prop('disabled', true);
+                
+                $.ajax({
+                    url: 'household_process.php',
+                    type: 'POST',
+                    data: {
+                        action: 'delete',
+                        id: deleteHouseholdId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('Delete response:', response);
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            alert('Error deleting household: ' + (response.message || 'Unknown error'));
+                            btn.prop('disabled', false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Delete error:', {
+                            status: status,
+                            error: error,
+                            responseText: xhr.responseText
+                        });
+                        
+                        let errorMessage = 'Error deleting household. ';
+                        
+                        if (xhr.responseText) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                errorMessage += response.message || error || 'Please try again.';
+                            } catch (e) {
+                                console.error('Parse error:', e);
+                                console.log('Raw response:', xhr.responseText);
+                                errorMessage += 'Server response error. Please try again.';
+                            }
+                        } else {
+                            errorMessage += error || 'Please try again.';
+                        }
+                        
+                        alert(errorMessage);
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            // Clear deleteHouseholdId when modal is hidden
+            $('#deleteHouseholdModal').on('hidden.bs.modal', function() {
+                deleteHouseholdId = null;
+                $('#confirmDelete').prop('disabled', false);
             });
 
             // Edit Household
