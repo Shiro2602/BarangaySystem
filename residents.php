@@ -4,9 +4,9 @@ require_once 'auth_check.php';
 
 // Add Resident
 if (isset($_POST['add_resident'])) {
-    $stmt = $conn->prepare("INSERT INTO residents (first_name, middle_name, last_name, birthdate, gender, civil_status, address, contact_number, email, occupation, nationality) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssssssss", 
+    $stmt = $conn->prepare("INSERT INTO residents (first_name, middle_name, last_name, birthdate, gender, civil_status, address, contact_number, email, occupation) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssssssss", 
         $_POST['first_name'],
         $_POST['middle_name'],
         $_POST['last_name'],
@@ -16,8 +16,7 @@ if (isset($_POST['add_resident'])) {
         $_POST['address'],
         $_POST['contact_number'],
         $_POST['email'],
-        $_POST['occupation'],
-        $_POST['nationality']
+        $_POST['occupation']
     );
     $stmt->execute();
 }
@@ -34,10 +33,9 @@ if (isset($_POST['edit_resident'])) {
         address = ?, 
         contact_number = ?, 
         email = ?, 
-        occupation = ?,
-        nationality = ? 
+        occupation = ? 
         WHERE id = ?");
-    $stmt->bind_param("sssssssssssi", 
+    $stmt->bind_param("ssssssssssi", 
         $_POST['first_name'],
         $_POST['middle_name'],
         $_POST['last_name'],
@@ -48,7 +46,6 @@ if (isset($_POST['edit_resident'])) {
         $_POST['contact_number'],
         $_POST['email'],
         $_POST['occupation'],
-        $_POST['nationality'],
         $_POST['resident_id']
     );
     $stmt->execute();
@@ -218,12 +215,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                 <input type="text" name="occupation" class="form-control">
                             </div>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label>Nationality</label>
-                                <input type="text" name="nationality" class="form-control" value="Filipino">
-                            </div>
-                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -287,12 +278,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                         <div class="col-md-4">
                             <label>Occupation</label>
                             <input type="text" id="view_occupation" class="form-control" readonly>
-                        </div>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label>Nationality</label>
-                            <input type="text" id="view_nationality" class="form-control" readonly>
                         </div>
                     </div>
                 </div>
@@ -366,12 +351,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                 <input type="text" name="occupation" id="edit_occupation" class="form-control">
                             </div>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label>Nationality</label>
-                                <input type="text" name="nationality" id="edit_nationality" class="form-control">
-                            </div>
-                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -430,7 +409,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     $('#view_contact_number').val(resident.contact_number);
                     $('#view_email').val(resident.email);
                     $('#view_occupation').val(resident.occupation);
-                    $('#view_nationality').val(resident.nationality);
                 }
             });
 
@@ -452,7 +430,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     $('#edit_contact_number').val(resident.contact_number);
                     $('#edit_email').val(resident.email);
                     $('#edit_occupation').val(resident.occupation);
-                    $('#edit_nationality').val(resident.nationality);
                 }
             });
 

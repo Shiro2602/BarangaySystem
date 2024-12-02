@@ -18,6 +18,15 @@ if (isset($_POST['submit_blotter'])) {
     $stmt->execute();
 }
 
+// Handle status update
+if (isset($_POST['update_status'])) {
+    $stmt = $conn->prepare("UPDATE blotter SET status = ? WHERE id = ?");
+    $stmt->bind_param("si", $_POST['status'], $_POST['blotter_id']);
+    $stmt->execute();
+    header("Location: blotter.php");
+    exit();
+}
+
 // Get all blotter records
 $query = "SELECT b.*, 
                      CONCAT(c.last_name, ', ', c.first_name) as complainant_name,
@@ -116,11 +125,97 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                             data-bs-target="#viewBlotterModal<?= $blotter['id'] ?>">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-warning" title="Update Status">
+                                    <button class="btn btn-sm btn-warning" title="Update Status" data-bs-toggle="modal" 
+                                            data-bs-target="#updateStatusModal<?= $blotter['id'] ?>">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                 </td>
                             </tr>
+
+                            <!-- View Details Modal -->
+                            <div class="modal fade" id="viewBlotterModal<?= $blotter['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Blotter Details - Case #<?= $blotter['id'] ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Complainant</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['complainant_name']) ?>" readonly>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Respondent</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['respondent_name']) ?>" readonly>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Incident Type</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['incident_type']) ?>" readonly>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Incident Date</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['incident_date']) ?>" readonly>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Location</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['incident_location']) ?>" readonly>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Status</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['status']) ?>" readonly>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Incident Details</label>
+                                                <textarea class="form-control" rows="4" readonly><?= htmlspecialchars($blotter['incident_details']) ?></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Date Filed</label>
+                                                <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['created_at']) ?>" readonly>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Update Status Modal -->
+                            <div class="modal fade" id="updateStatusModal<?= $blotter['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Update Status - Case #<?= $blotter['id'] ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="blotter_id" value="<?= $blotter['id'] ?>">
+                                                <div class="mb-3">
+                                                    <label>Status</label>
+                                                    <select name="status" class="form-control" required>
+                                                        <option value="Pending" <?= $blotter['status'] == 'Pending' ? 'selected' : '' ?>>Pending</option>
+                                                        <option value="Ongoing" <?= $blotter['status'] == 'Ongoing' ? 'selected' : '' ?>>Ongoing</option>
+                                                        <option value="Resolved" <?= $blotter['status'] == 'Resolved' ? 'selected' : '' ?>>Resolved</option>
+                                                        <option value="Dismissed" <?= $blotter['status'] == 'Dismissed' ? 'selected' : '' ?>>Dismissed</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" name="update_status" class="btn btn-primary">Update Status</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
