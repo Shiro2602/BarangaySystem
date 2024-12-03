@@ -2,6 +2,13 @@
 require_once 'auth_check.php';
 require_once 'config.php';
 
+// Check if user has admin role (case-insensitive)
+if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'admin') {
+    $_SESSION['error'] = "Access denied. This page is only accessible to administrators.";
+    header("Location: index.php");
+    exit();
+}
+
 // Handle official submission
 if (isset($_POST['add_official'])) {
     $stmt = $conn->prepare("INSERT INTO officials (position, first_name, last_name, contact_number, term_start, term_end) 
@@ -17,12 +24,34 @@ if (isset($_POST['add_official'])) {
     $stmt->execute();
 }
 
+// Handle editing official
+if (isset($_POST['edit_official'])) {
+    $stmt = $conn->prepare("UPDATE officials SET position = ?, first_name = ?, last_name = ?, 
+                           contact_number = ?, term_start = ?, term_end = ? WHERE id = ?");
+    $stmt->bind_param("ssssssi",
+        $_POST['position'],
+        $_POST['first_name'],
+        $_POST['last_name'],
+        $_POST['contact_number'],
+        $_POST['term_start'],
+        $_POST['term_end'],
+        $_POST['official_id']
+    );
+    $stmt->execute();
+}
+
+// Handle ending official's term
+if (isset($_POST['end_term'])) {
+    $stmt = $conn->prepare("UPDATE officials SET status = 'Inactive' WHERE id = ?");
+    $stmt->bind_param("i", $_POST['official_id']);
+    $stmt->execute();
+}
+
 // Get all active officials
 $query = "SELECT * FROM officials WHERE status = 'Active' ORDER BY position";
 $result = $conn->query($query);
 $officials = $result->fetch_all(MYSQLI_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,7 +91,6 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
     <div class="container-fluid">
         <div class="row">
             <?php require_once __DIR__ . '/includes/header.php'; ?>
-
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="row mb-4">
                     <div class="col-12 d-flex justify-content-between align-items-center">
@@ -94,10 +122,10 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
                                     <?= htmlspecialchars($official['contact_number']) ?>
                                 </p>
                                 <div class="mt-3">
-                                    <button class="btn btn-sm btn-warning" title="Edit">
+                                    <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
-                                    <button class="btn btn-sm btn-danger" title="End Term">
+                                    <button class="btn btn-sm btn-danger" title="End Term" data-bs-toggle="modal" data-bs-target="#endTermModal<?= $official['id'] ?>">
                                         <i class="fas fa-user-times"></i> End Term
                                     </button>
                                 </div>
@@ -141,7 +169,7 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
                                             <button class="btn btn-sm btn-info" title="View">
                                                 <i class="fas fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-warning" title="Edit">
+                                            <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                         </td>
@@ -210,6 +238,88 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
             </div>
         </div>
     </div>
+
+    <?php foreach ($officials as $official): ?>
+    <!-- Edit Official Modal -->
+    <div class="modal fade" id="editOfficialModal<?= $official['id'] ?>" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Official</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label>Position</label>
+                            <select name="position" class="form-control" required>
+                                <option value="<?= $official['position'] ?>"><?= $official['position'] ?></option>
+                                <option value="Barangay Chairman">Barangay Chairman</option>
+                                <option value="Barangay Secretary">Barangay Secretary</option>
+                                <option value="Barangay Treasurer">Barangay Treasurer</option>
+                                <option value="Kagawad">Kagawad</option>
+                                <option value="SK Chairman">SK Chairman</option>
+                            </select>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>First Name</label>
+                                <input type="text" name="first_name" value="<?= $official['first_name'] ?>" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Last Name</label>
+                                <input type="text" name="last_name" value="<?= $official['last_name'] ?>" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Contact Number</label>
+                            <input type="text" name="contact_number" value="<?= $official['contact_number'] ?>" class="form-control" required>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Term Start</label>
+                                <input type="date" name="term_start" value="<?= $official['term_start'] ?>" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Term End</label>
+                                <input type="date" name="term_end" value="<?= $official['term_end'] ?>" class="form-control" required>
+                            </div>
+                        </div>
+                        <input type="hidden" name="official_id" value="<?= $official['id'] ?>">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" name="edit_official" class="btn btn-primary">Edit Official</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
+    <?php foreach ($officials as $official): ?>
+    <!-- End Term Modal -->
+    <div class="modal fade" id="endTermModal<?= $official['id'] ?>" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">End Term</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <p>Are you sure you want to end the term of <?= $official['first_name'] . ' ' . $official['last_name'] ?>?</p>
+                        <input type="hidden" name="official_id" value="<?= $official['id'] ?>">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" name="end_term" class="btn btn-danger">End Term</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

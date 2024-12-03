@@ -1,6 +1,19 @@
 <?php
 require_once 'config.php';
 require_once 'auth.php';
+
+// Get all active officials
+$query = "SELECT * FROM officials WHERE status = 'Active' ORDER BY position";
+$result = $conn->query($query);
+$officials = $result->fetch_all(MYSQLI_ASSOC);
+
+// Get statistics for dashboard cards
+$stats = [
+    'residents' => $conn->query("SELECT COUNT(*) FROM residents")->fetch_row()[0],
+    'clearances' => $conn->query("SELECT COUNT(*) FROM clearances WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
+    'indigency' => $conn->query("SELECT COUNT(*) FROM indigency WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
+    'blotters' => $conn->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetch_row()[0]
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,6 +41,18 @@ require_once 'auth.php';
         .main-content {
             padding: 20px;
         }
+        .officials-table {
+            font-size: 0.9rem;
+        }
+        .officials-table th, .officials-table td {
+            padding: 8px;
+        }
+        .stat-card {
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
     </style>
 </head>
 <body>
@@ -36,6 +61,16 @@ require_once 'auth.php';
             <?php require_once __DIR__ . '/includes/header.php'; ?>
 
             <div class="col-md-9 col-lg-10 main-content">
+                <?php if (isset($_SESSION['error'])): ?>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <?php 
+                        echo htmlspecialchars($_SESSION['error']);
+                        unset($_SESSION['error']);
+                        ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Header with user info -->
                 <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm">
                     <h2 class="mb-0">Dashboard</h2>
@@ -50,38 +85,88 @@ require_once 'auth.php';
                         </ul>
                     </div>
                 </div>
-                
-                <!-- Dashboard Cards -->
+
                 <div class="row">
-                    <div class="col-md-3 mb-4">
-                        <div class="card bg-primary text-white">
+                    <!-- Officials Table Section (Left) -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Current Barangay Officials</h5>
+                            </div>
                             <div class="card-body">
-                                <h5 class="card-title">Total Residents</h5>
-                                <p class="card-text display-6">0</p>
+                                <div class="table-responsive">
+                                    <table class="table table-hover officials-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Position</th>
+                                                <th>Name</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($officials as $official): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($official['position']) ?></td>
+                                                <td><?= htmlspecialchars($official['first_name'] . ' ' . $official['last_name']) ?></td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-4">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Clearances Issued</h5>
-                                <p class="card-text display-6">0</p>
+
+                    <!-- Dashboard Cards Section (Right) -->
+                    <div class="col-md-4">
+                        <!-- Total Residents Card -->
+                        <div class="card mb-3 stat-card">
+                            <div class="card-body bg-primary text-white rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-0">Total Residents</h6>
+                                        <h2 class="mb-0 mt-2"><?= number_format($stats['residents']) ?></h2>
+                                    </div>
+                                    <i class="fas fa-users fa-2x opacity-75"></i>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 mb-4">
-                        <div class="card bg-warning text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Indigency Certificates</h5>
-                                <p class="card-text display-6">0</p>
+
+                        <!-- Clearances Card -->
+                        <div class="card mb-3 stat-card">
+                            <div class="card-body bg-success text-white rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-0">Clearances Issued</h6>
+                                        <h2 class="mb-0 mt-2"><?= number_format($stats['clearances']) ?></h2>
+                                    </div>
+                                    <i class="fas fa-file-alt fa-2x opacity-75"></i>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 mb-4">
-                        <div class="card bg-danger text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Active Blotters</h5>
-                                <p class="card-text display-6">0</p>
+
+                        <!-- Indigency Card -->
+                        <div class="card mb-3 stat-card">
+                            <div class="card-body bg-warning text-white rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-0">Indigency Certificates</h6>
+                                        <h2 class="mb-0 mt-2"><?= number_format($stats['indigency']) ?></h2>
+                                    </div>
+                                    <i class="fas fa-certificate fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Blotters Card -->
+                        <div class="card mb-3 stat-card">
+                            <div class="card-body bg-danger text-white rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-0">Active Blotters</h6>
+                                        <h2 class="mb-0 mt-2"><?= number_format($stats['blotters']) ?></h2>
+                                    </div>
+                                    <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
