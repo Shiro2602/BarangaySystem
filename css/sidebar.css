@@ -30,7 +30,7 @@
     display: block;
     margin-bottom: 5px;
     border-radius: 5px;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .sidebar a:hover {
@@ -49,35 +49,12 @@
     margin-right: 10px;
 }
 
-/* Main Content Styles */
+/* Main Content Adjustment */
 .main-content {
-    margin-left: 250px; /* Same as sidebar width */
-    padding: 20px;
+    margin-left: 250px;
+    padding: 20px 30px;
     min-height: 100vh;
-    width: calc(100% - 250px);
-}
-
-/* Container fluid override */
-.container-fluid {
-    padding-left: 0;
-    padding-right: 0;
-}
-
-/* Row override for sidebar layout */
-.container-fluid > .row {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 200px;
-    }
-    .main-content {
-        margin-left: 200px;
-        width: calc(100% - 200px);
-    }
+    background-color: #f8f9fa;
 }
 
 /* Scrollbar Styling */
