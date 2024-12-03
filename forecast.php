@@ -7,6 +7,36 @@ $forecast_result = null;
 $error_message = null;
 $debug_info = '';
 
+// Function to find Python executable
+function findPythonPath() {
+    // Common Python installation paths on Windows
+    $possible_paths = array(
+        'C:\\Python313\\python.exe',
+        'C:\\Python312\\python.exe',
+        'C:\\Python311\\python.exe',
+        'C:\\Python310\\python.exe',
+        'C:\\Program Files\\Python313\\python.exe',
+        'C:\\Program Files\\Python312\\python.exe',
+        'C:\\Program Files\\Python311\\python.exe',
+        'C:\\Program Files\\Python310\\python.exe',
+        'C:\\Program Files (x86)\\Python313\\python.exe',
+        'C:\\Program Files (x86)\\Python312\\python.exe',
+        'C:\\Program Files (x86)\\Python311\\python.exe',
+        'C:\\Program Files (x86)\\Python310\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python313\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python310\\python.exe'
+    );
+
+    foreach ($possible_paths as $path) {
+        if (file_exists($path)) {
+            return '"' . $path . '"';
+        }
+    }
+    return null;
+}
+
 if (isset($_POST['submit_forecast'])) {
     $target_dir = "uploads/";
     if (!file_exists($target_dir)) {
@@ -25,38 +55,65 @@ if (isset($_POST['submit_forecast'])) {
     if ($uploadOk && move_uploaded_file($_FILES["population_data"]["tmp_name"], $target_file)) {
         $forecast_years = $_POST['forecast_years'] ?? 5;
         
-        $python_path = '"C:\\Users\\Encarnacion\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"';
-        $script_path = realpath("scripts/population_forecast.py");
-        $data_path = realpath($target_file);
-        
-        $command = "$python_path \"$script_path\" \"$data_path\" $forecast_years 2>&1";
-        $debug_info .= "Command: " . $command . "\n";
-        
-        $output = shell_exec($command);
-        $debug_info .= "Raw output: " . ($output ?? "NULL") . "\n";
-        
-        if ($output !== null) {
-            $forecast_result = json_decode($output, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $error_message = "Error parsing JSON output: " . json_last_error_msg();
-                $debug_info .= "JSON Error: " . json_last_error_msg() . "\n";
-            } elseif (isset($forecast_result['error'])) {
-                $error_message = $forecast_result['error'];
-                $debug_info .= "Script Error: " . $forecast_result['error'] . "\n";
-                $forecast_result = null;
-            }
+        // Find Python path
+        $python_path = findPythonPath();
+        if ($python_path === null) {
+            $error_message = "Python not found. Please follow these steps to install Python:<br><br>" .
+                           "1. Download Python from <a href='https://www.python.org/downloads/' target='_blank'>python.org</a><br>" .
+                           "2. Run the installer and make sure to check 'Add Python to PATH'<br>" .
+                           "3. Open Command Prompt and run these commands:<br>" .
+                           "<code>pip install statsmodels pandas numpy scikit-learn</code><br><br>" .
+                           "After installation, refresh this page and try again.";
+            $debug_info .= "Could not find Python in common installation locations\n";
         } else {
-            $error_message = "Error executing the forecast script.";
-            $debug_info .= "Shell exec returned null\n";
+            $script_path = realpath("scripts/population_forecast.py");
+            $data_path = realpath($target_file);
             
             if (!file_exists($script_path)) {
-                $debug_info .= "Script file not found at: $script_path\n";
-            }
-            if (!file_exists($data_path)) {
+                $error_message = "Forecast script not found.";
+                $debug_info .= "Script not found at: $script_path\n";
+            } elseif (!file_exists($data_path)) {
+                $error_message = "Data file not found.";
                 $debug_info .= "Data file not found at: $data_path\n";
+            } else {
+                // Properly escape paths
+                $script_path = '"' . $script_path . '"';
+                $data_path = '"' . $data_path . '"';
+                
+                // First, test Python installation
+                $test_cmd = $python_path . ' -c "import pandas; import numpy; import statsmodels.api; import sklearn.metrics" 2>&1';
+                $test_output = shell_exec($test_cmd);
+                
+                if ($test_output !== null && strpos($test_output, 'ImportError') !== false) {
+                    $error_message = "Required Python packages are missing. Please run this command in Command Prompt:<br>" .
+                                   "<code>pip install statsmodels pandas numpy scikit-learn</code>";
+                    $debug_info .= "Package test output: " . $test_output . "\n";
+                } else {
+                    $command = "$python_path $script_path $data_path $forecast_years 2>&1";
+                    $debug_info .= "Command: " . $command . "\n";
+                    
+                    $output = shell_exec($command);
+                    $debug_info .= "Raw output: " . ($output ?? "NULL") . "\n";
+                    
+                    if ($output !== null) {
+                        $forecast_result = json_decode($output, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $error_message = "Error parsing JSON output: " . json_last_error_msg();
+                            $debug_info .= "JSON Error: " . json_last_error_msg() . "\n";
+                        } elseif (isset($forecast_result['error'])) {
+                            $error_message = $forecast_result['error'];
+                            $debug_info .= "Script Error: " . $forecast_result['error'] . "\n";
+                            $forecast_result = null;
+                        }
+                    } else {
+                        $error_message = "Error executing the forecast script.";
+                        $debug_info .= "Shell exec returned null\n";
+                    }
+                }
             }
         }
 
+        // Clean up the uploaded file
         if (file_exists($target_file)) {
             unlink($target_file);
         }
@@ -74,6 +131,7 @@ if (isset($_POST['submit_forecast'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="css/sidebar.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Population Forecast</title>
     <style>
         .sidebar {
@@ -105,7 +163,7 @@ if (isset($_POST['submit_forecast'])) {
     <div class="container-fluid">
         <div class="row">
             <?php include 'includes/header.php'; ?>
-
+            
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="container py-4">
@@ -238,33 +296,93 @@ if (isset($_POST['submit_forecast'])) {
         const labels = [...historicalData.map(d => d.year), ...forecastData.map(d => d.year)];
         const historicalValues = [...historicalData.map(d => d.population), ...Array(forecastData.length).fill(null)];
         const forecastValues = [...Array(historicalData.length).fill(null), ...forecastData.map(d => d.population)];
+        const lowerCI = [...Array(historicalData.length).fill(null), ...forecastData.map(d => d.lower_ci)];
+        const upperCI = [...Array(historicalData.length).fill(null), ...forecastData.map(d => d.upper_ci)];
+
         const ctx = document.getElementById('forecastChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: 'Historical Population',
-                    data: historicalValues,
-                    borderColor: 'rgb(54, 162, 235)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                    fill: true
-                },
-                {
-                    label: 'Forecast Population',
-                    data: forecastValues,
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderDash: [5, 5],
-                    fill: true
-                }]
+                datasets: [
+                    {
+                        label: 'Historical Population',
+                        data: historicalValues,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Forecast Population',
+                        data: forecastValues,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Confidence Interval',
+                        data: upperCI,
+                        borderColor: 'rgba(255, 99, 132, 0.2)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        fill: '+1',  // Fill to the next dataset
+                        pointRadius: 0,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Lower Confidence Interval',
+                        data: lowerCI,
+                        borderColor: 'rgba(255, 99, 132, 0.2)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        fill: false,
+                        pointRadius: 0,
+                        borderWidth: 0,
+                        hidden: true  // Hide this dataset from legend
+                    }
+                ]
             },
             options: {
                 responsive: true,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Population Forecast'
+                        text: 'Population Forecast with Confidence Intervals',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            filter: function(legendItem, data) {
+                                return !legendItem.hidden;  // Only show non-hidden datasets
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat().format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -272,13 +390,24 @@ if (isset($_POST['submit_forecast'])) {
                         beginAtZero: false,
                         title: {
                             display: true,
-                            text: 'Population'
+                            text: 'Population',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            callback: function(value, index, values) {
+                                return new Intl.NumberFormat().format(value);
+                            }
                         }
                     },
                     x: {
                         title: {
                             display: true,
-                            text: 'Year'
+                            text: 'Year',
+                            font: {
+                                weight: 'bold'
+                            }
                         }
                     }
                 }
