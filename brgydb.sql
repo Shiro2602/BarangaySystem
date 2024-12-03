@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 02, 2024 at 06:27 AM
+-- Generation Time: Dec 03, 2024 at 02:13 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -37,15 +37,26 @@ CREATE TABLE `blotter` (
   `incident_details` text NOT NULL,
   `status` enum('Pending','Ongoing','Resolved','Dismissed') DEFAULT 'Pending',
   `resolution` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `blotter`
 --
 
-INSERT INTO `blotter` (`id`, `complainant_id`, `respondent_id`, `incident_type`, `incident_date`, `incident_location`, `incident_details`, `status`, `resolution`, `created_at`) VALUES
-(1, 1, 1, 'Others', '2024-11-27', 'Test Location', 'test', 'Pending', NULL, '2024-11-29 12:20:11');
+INSERT INTO `blotter` (`id`, `complainant_id`, `respondent_id`, `incident_type`, `incident_date`, `incident_location`, `incident_details`, `status`, `resolution`, `created_at`, `latitude`, `longitude`) VALUES
+(1, 1, 1, 'Others', '2024-11-27', 'Test Location', 'test', 'Pending', NULL, '2024-11-29 12:20:11', NULL, NULL),
+(2, 1, 2, 'Others', '2024-01-15', 'Near Labac Elementary School, Brgy. Labac, Naic, Cavite', 'Complainant reported missing personal belongings near the school premises', 'Pending', NULL, '2024-12-03 11:38:29', 14.31570000, 120.76750000),
+(3, 3, 4, 'Others', '2024-01-20', 'Labac Public Market, Brgy. Labac, Naic, Cavite', 'Verbal altercation between market vendors', '', 'Scheduled for mediation', '2024-12-03 11:38:29', 14.31590000, 120.76770000),
+(4, 2, 3, 'Others', '2024-01-25', 'Labac Basketball Court, Brgy. Labac, Naic, Cavite', 'Disturbance during basketball game', 'Resolved', 'Both parties agreed to maintain peace', '2024-12-03 11:38:29', 14.31550000, 120.76730000),
+(5, 4, 1, 'Others', '2024-02-01', 'Purok 2, Brgy. Labac, Naic, Cavite', 'Noise complaint from neighboring residence during late hours', 'Pending', NULL, '2024-12-03 11:38:29', 14.31580000, 120.76760000),
+(6, 1, 2, 'Others', '2024-01-15', 'Near Labac Elementary School, Brgy. Labac, Naic, Cavite', 'Complainant reported missing personal belongings near the school premises', 'Pending', NULL, '2024-12-03 11:42:40', 14.31320000, 120.73740000),
+(7, 3, 4, 'Others', '2024-01-20', 'Labac Public Market, Brgy. Labac, Naic, Cavite', 'Verbal altercation between market vendors', '', 'Scheduled for mediation', '2024-12-03 11:42:40', 14.31350000, 120.73770000),
+(8, 2, 3, 'Others', '2024-01-25', 'Labac Basketball Court, Brgy. Labac, Naic, Cavite', 'Disturbance during basketball game', 'Resolved', 'Both parties agreed to maintain peace', '2024-12-03 11:42:40', 14.31300000, 120.73700000),
+(9, 4, 1, 'Others', '2024-02-01', 'Purok 2, Brgy. Labac, Naic, Cavite', 'Noise complaint from neighboring residence during late hours', 'Pending', NULL, '2024-12-03 11:42:40', 14.31330000, 120.73750000),
+(10, 3, 1, 'Assault', '2024-12-04', 'Front of Labac Church', 'test', 'Pending', NULL, '2024-12-03 11:53:05', 14.31268021, 120.73908443);
 
 -- --------------------------------------------------------
 
@@ -69,7 +80,7 @@ CREATE TABLE `clearances` (
 --
 
 INSERT INTO `clearances` (`id`, `resident_id`, `purpose`, `issue_date`, `expiry_date`, `or_number`, `amount`, `status`) VALUES
-(1, 1, 'test', '2024-11-29', '2025-05-29', '05468406810350', 1.00, 'Pending');
+(1, 1, 'test', '2024-11-29', '2025-05-29', '05468406810350', 1.00, 'Rejected');
 
 -- --------------------------------------------------------
 
@@ -157,17 +168,22 @@ CREATE TABLE `residents` (
   `email` varchar(100) DEFAULT NULL,
   `occupation` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `household_id` int(11) DEFAULT NULL
+  `household_id` int(11) DEFAULT NULL,
+  `nationality` varchar(50) DEFAULT 'Filipino'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `residents`
 --
 
-INSERT INTO `residents` (`id`, `first_name`, `middle_name`, `last_name`, `birthdate`, `gender`, `civil_status`, `address`, `contact_number`, `email`, `occupation`, `created_at`, `household_id`) VALUES
-(1, 'Juan', 'Manuel', 'Dela Cruz', '1990-01-15', 'Male', 'Married', '123 Sample St., Barangay Sample', '09123456789', NULL, 'Employee', '2024-11-28 13:46:43', 5),
-(2, 'Test', 'Lorem', 'Ipsum', '2011-05-25', 'Male', 'Single', '84 Labac, Naic, Cavite', '09166846214', 'test2@gmail.com', 'Student', '2024-11-30 09:50:04', 6),
-(3, 'rewq', 'qwer', 'alsdkjasldkj', '1991-06-21', 'Male', 'Single', '34', '12312031023', '', 'Rigger', '2024-12-01 13:52:41', 5);
+INSERT INTO `residents` (`id`, `first_name`, `middle_name`, `last_name`, `birthdate`, `gender`, `civil_status`, `address`, `contact_number`, `email`, `occupation`, `created_at`, `household_id`, `nationality`) VALUES
+(1, 'Juan', 'Manuel', 'Dela Cruz', '1990-01-15', 'Male', 'Married', '123 Sample St., Barangay Sample', '09123456789', '', 'Employee', '2024-11-28 13:46:43', 5, 'American'),
+(2, 'Test', 'Lorem', 'Ipsum', '2011-05-25', 'Male', 'Single', '84 Labac, Naic, Cavite', '09166846214', 'test2@gmail.com', 'Student', '2024-11-30 09:50:04', 6, 'Filipino'),
+(3, 'rewq', 'qwer', 'alsdkjasldkj', '1991-06-21', 'Male', 'Single', '34', '12312031023', '', 'Rigger', '2024-12-01 13:52:41', 5, 'Filipino'),
+(4, 'Juan', NULL, 'Dela Cruz', '1990-05-15', 'Male', 'Single', 'Purok 1, Brgy. Labac, Naic, Cavite', '09123456789', NULL, 'Teacher', '2024-12-03 11:13:37', NULL, 'Filipino'),
+(5, 'Maria', NULL, 'Santos', '1985-08-22', 'Female', 'Married', 'Purok 2, Brgy. Labac, Naic, Cavite', '09187654321', NULL, 'Nurse', '2024-12-03 11:13:37', NULL, 'Filipino'),
+(6, 'Pedro', NULL, 'Garcia', '1988-03-10', 'Male', 'Married', 'Purok 3, Brgy. Labac, Naic, Cavite', '09198765432', NULL, 'Driver', '2024-12-03 11:13:37', NULL, 'Filipino'),
+(7, 'Ana', NULL, 'Reyes', '1992-11-30', 'Female', 'Single', 'Purok 4, Brgy. Labac, Naic, Cavite', '09165432198', NULL, 'Engineer', '2024-12-03 11:13:37', NULL, 'Filipino');
 
 -- --------------------------------------------------------
 
@@ -193,7 +209,9 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `username`, `password`, `role`, `first_name`, `last_name`, `email`, `created_at`) VALUES
 (2, 'admin', '$2y$10$8K1p/a7qtYN.YkwFAIKQzON.1lqKzJ6.O4cTY1nM8UKpwZAyoHjnS', 'admin', 'System', 'Administrator', 'admin@example.com', '2024-11-29 11:43:47'),
 (3, 'admin2', '$2y$10$9.r.Qi0MwZxhOAsmEdjYpuc9uAqXulL6APkxUl.7Sqg2gXyamKEjS', 'admin', 'Admin', 'Admin', 'admin2@gmail.com', '2024-11-29 11:55:01'),
-(5, 'admin3', '$2y$10$JfxLiRurnJSRaJDWin3jCuorklto7pUhdUJ20J.oat3pWxJm2Scb6', 'admin', 'Admin', 'User', 'admin@example.com', '2024-11-30 08:30:46');
+(5, 'admin3', '$2y$10$JfxLiRurnJSRaJDWin3jCuorklto7pUhdUJ20J.oat3pWxJm2Scb6', 'admin', 'Admin', 'User', 'admin@example.com', '2024-11-30 08:30:46'),
+(6, 'Secretary', '$2y$10$0efbCSS3LR3VirYQleevpe9UkfCIQI7OLzVSgbo2Z9KPH1ZerK0oG', 'secretary', 'Secretary', '01', 'sec@gmail.com', '2024-12-02 12:25:32'),
+(7, 'Staff1', '$2y$10$cOZgPDTAJf4WK2Dsld7JxuXr.p6o5c/dm8TwVATBXiA0RNbR1tjc2', 'staff', 'req', 'qwe', 'req@gmail.com', '2024-12-02 12:30:35');
 
 --
 -- Indexes for dumped tables
@@ -256,7 +274,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `blotter`
 --
 ALTER TABLE `blotter`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `clearances`
@@ -286,13 +304,13 @@ ALTER TABLE `officials`
 -- AUTO_INCREMENT for table `residents`
 --
 ALTER TABLE `residents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- Constraints for dumped tables
