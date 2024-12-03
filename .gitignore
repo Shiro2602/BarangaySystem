@@ -1,0 +1,11 @@
+# Ignore configuration files containing sensitive information
+includes/config_maps.php
+
+# Ignore common PHP files
+.env
+vendor/
+composer.lock
+
+# Ignore common system files
+.DS_Store
+Thumbs.db

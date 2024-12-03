@@ -1,6 +1,7 @@
 <?php
 require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'includes/config_maps.php';
 
 // Get all blotter records with location data
 $query = "SELECT b.*, 
@@ -205,18 +206,18 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdF_zkpToHo6ULm-Dv9LDL2r_qQcwb9x8&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_API_KEY; ?>&callback=initMap" async defer></script>
     <script>
         const incidents = <?php echo json_encode($incidents); ?>;
+        const BARANGAY_LAT = <?php echo BARANGAY_LAT; ?>;
+        const BARANGAY_LNG = <?php echo BARANGAY_LNG; ?>;
         let map;
         let markers = [];
         let geocoder;
 
         function initMap() {
-            geocoder = new google.maps.Geocoder();
-            
             // Center on Labac, Naic, Cavite
-            const labacCenter = { lat: 14.3190, lng: 120.7750 };
+            const labacCenter = { lat: BARANGAY_LAT, lng: BARANGAY_LNG };
             
             map = new google.maps.Map(document.getElementById('map'), {
                 center: labacCenter,
@@ -245,43 +246,36 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
 
         function plotIncidents() {
             incidents.forEach(incident => {
-                let fullAddress = incident.incident_location;
-                if (!fullAddress.toLowerCase().includes('labac')) {
-                    fullAddress += ', Labac, Naic, Cavite';
-                }
-
-                geocoder.geocode({ address: fullAddress }, (results, status) => {
-                    if (status === 'OK') {
-                        let markerColor;
-                        switch(incident.status) {
-                            case 'Pending': markerColor = 'red'; break;
-                            case 'Ongoing': markerColor = 'orange'; break;
-                            case 'Resolved': markerColor = 'green'; break;
-                            case 'Dismissed': markerColor = 'gray'; break;
-                            default: markerColor = 'red';
-                        }
-
-                        const marker = new google.maps.Marker({
-                            map: map,
-                            position: results[0].geometry.location,
-                            title: incident.incident_type,
-                            icon: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`
-                        });
-
-                        const infoWindow = new google.maps.InfoWindow({
-                            content: `<strong>${incident.incident_type}</strong><br>
-                                     Date: ${incident.incident_date}<br>
-                                     Status: ${incident.status}`
-                        });
-
-                        marker.addListener('mouseover', () => infoWindow.open(map, marker));
-                        marker.addListener('mouseout', () => infoWindow.close());
-                        marker.addListener('click', () => showIncidentDetails(incident));
-
-                        marker.incident = incident;
-                        markers.push(marker);
+                if (incident.latitude && incident.longitude) {
+                    let markerColor;
+                    switch(incident.status) {
+                        case 'Pending': markerColor = 'red'; break;
+                        case 'Ongoing': markerColor = 'orange'; break;
+                        case 'Resolved': markerColor = 'green'; break;
+                        case 'Dismissed': markerColor = 'gray'; break;
+                        default: markerColor = 'red';
                     }
-                });
+
+                    const marker = new google.maps.Marker({
+                        map: map,
+                        position: { lat: parseFloat(incident.latitude), lng: parseFloat(incident.longitude) },
+                        title: incident.incident_type,
+                        icon: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`
+                    });
+
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `<strong>${incident.incident_type}</strong><br>
+                                 Date: ${incident.incident_date}<br>
+                                 Status: ${incident.status}`
+                    });
+
+                    marker.addListener('mouseover', () => infoWindow.open(map, marker));
+                    marker.addListener('mouseout', () => infoWindow.close());
+                    marker.addListener('click', () => showIncidentDetails(incident));
+
+                    marker.incident = incident;
+                    markers.push(marker);
+                }
             });
         }
 

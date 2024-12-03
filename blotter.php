@@ -1,19 +1,22 @@
 <?php
 require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'includes/config_maps.php';
 
 // Handle blotter record submission
 if (isset($_POST['submit_blotter'])) {
     $stmt = $conn->prepare("INSERT INTO blotter (complainant_id, respondent_id, incident_type, incident_date, 
-                          incident_location, incident_details) 
-                          VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("iisssss",
+                          incident_location, incident_details, latitude, longitude) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("iissssdd",
         $_POST['complainant_id'],
         $_POST['respondent_id'],
         $_POST['incident_type'],
         $_POST['incident_date'],
         $_POST['incident_location'],
-        $_POST['incident_details']
+        $_POST['incident_details'],
+        $_POST['latitude'],
+        $_POST['longitude']
     );
     $stmt->execute();
 }
@@ -50,27 +53,27 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blotter Records - Barangay System</title>
+    <title>Blotter Records - Barangay Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="css/sidebar.css" rel="stylesheet">
     <style>
-        .sidebar {
-            height: 100vh;
-            background-color: #343a40;
-            padding-top: 20px;
+        #locationMap {
+            height: 300px;
+            width: 100%;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
-        .sidebar a {
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            display: block;
+        /* Ensure the modal is wide enough for the map */
+        .modal-lg {
+            max-width: 800px;
         }
-        .sidebar a:hover {
-            background-color: #495057;
-        }
-        .main-content {
-            padding: 20px;
+        /* Ensure the map container is visible */
+        .modal-body {
+            padding: 1rem;
+            max-height: 80vh;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -229,15 +232,15 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Blotter Record</h5>
+                    <h5 class="modal-title">Add New Blotter Record</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST">
-                    <div class="modal-body">
+                <div class="modal-body">
+                    <form id="blotterForm" method="post">
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label>Complainant</label>
-                                <select name="complainant_id" class="form-control" required>
+                                <label class="form-label">Complainant</label>
+                                <select class="form-select" name="complainant_id" required>
                                     <option value="">Select Complainant</option>
                                     <?php foreach ($residents as $resident): ?>
                                         <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
@@ -245,8 +248,8 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label>Respondent</label>
-                                <select name="respondent_id" class="form-control" required>
+                                <label class="form-label">Respondent</label>
+                                <select class="form-select" name="respondent_id" required>
                                     <option value="">Select Respondent</option>
                                     <?php foreach ($residents as $resident): ?>
                                         <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
@@ -256,50 +259,128 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label>Incident Type</label>
-                                <select name="incident_type" class="form-control" required>
+                                <label class="form-label">Incident Type</label>
+                                <select class="form-select" name="incident_type" required>
                                     <option value="">Select Type</option>
-                                    <option value="Assault">Assault</option>
-                                    <option value="Theft">Theft</option>
-                                    <option value="Harassment">Harassment</option>
-                                    <option value="Property Damage">Property Damage</option>
-                                    <option value="Noise Complaint">Noise Complaint</option>
                                     <option value="Others">Others</option>
+                                    <option value="Theft">Theft</option>
+                                    <option value="Assault">Assault</option>
+                                    <option value="Vandalism">Vandalism</option>
+                                    <option value="Noise Complaint">Noise Complaint</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label>Incident Date</label>
-                                <input type="date" name="incident_date" class="form-control" required>
+                                <label class="form-label">Incident Date</label>
+                                <input type="datetime-local" class="form-control" name="incident_date" required>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label>Incident Location</label>
-                            <input type="text" name="incident_location" class="form-control" required>
+                            <label class="form-label">Incident Location</label>
+                            <input type="text" class="form-control" name="incident_location" id="incident_location" required>
+                            <small class="text-muted">Click on the map to set the location</small>
+                            <div id="locationMap"></div>
+                            <input type="hidden" name="latitude" id="latitude">
+                            <input type="hidden" name="longitude" id="longitude">
                         </div>
                         <div class="mb-3">
-                            <label>Incident Details</label>
-                            <textarea name="incident_details" class="form-control" rows="4" required></textarea>
+                            <label class="form-label">Incident Details</label>
+                            <textarea class="form-control" name="incident_details" rows="4" required></textarea>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" name="submit_blotter" class="btn btn-primary">Submit Record</button>
-                    </div>
-                </form>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" name="submit_blotter" class="btn btn-primary">Submit</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    
     <script>
+        // Define the coordinates from PHP
+        const BARANGAY_LAT = <?php echo BARANGAY_LAT; ?>;
+        const BARANGAY_LNG = <?php echo BARANGAY_LNG; ?>;
+        let map;
+        let marker;
+        let geocoder;
+
+        function initMap() {
+            const labacCenter = { lat: BARANGAY_LAT, lng: BARANGAY_LNG };
+            
+            map = new google.maps.Map(document.getElementById('locationMap'), {
+                center: labacCenter,
+                zoom: 16,
+                mapTypeControl: true,
+                streetViewControl: true,
+                fullscreenControl: true
+            });
+
+            geocoder = new google.maps.Geocoder();
+
+            // Add click event to map
+            map.addListener('click', function(e) {
+                placeMarker(e.latLng);
+            });
+        }
+
+        function placeMarker(location) {
+            if (marker) {
+                marker.setMap(null);
+            }
+            
+            marker = new google.maps.Marker({
+                position: location,
+                map: map
+            });
+
+            // Update form fields
+            document.getElementById('latitude').value = location.lat();
+            document.getElementById('longitude').value = location.lng();
+            
+            // Reverse geocode to get address
+            geocoder.geocode({ location: location }, (results, status) => {
+                if (status === 'OK') {
+                    if (results[0]) {
+                        document.getElementById('incident_location').value = results[0].formatted_address;
+                    }
+                }
+            });
+        }
+
         $(document).ready(function() {
             $('#blotterTable').DataTable({
                 order: [[0, 'desc']]
             });
+
+            // Initialize map when modal is shown
+            $('#addBlotterModal').on('shown.bs.modal', function () {
+                if (!map) {
+                    initMap();
+                }
+                // Trigger a resize event to ensure the map displays properly
+                google.maps.event.trigger(map, 'resize');
+                // Re-center the map
+                map.setCenter({ lat: BARANGAY_LAT, lng: BARANGAY_LNG });
+            });
+
+            // Reset map marker when modal is closed
+            $('#addBlotterModal').on('hidden.bs.modal', function () {
+                if (marker) {
+                    marker.setMap(null);
+                }
+                document.getElementById('latitude').value = '';
+                document.getElementById('longitude').value = '';
+                document.getElementById('incident_location').value = '';
+            });
         });
     </script>
+    
+    <!-- Load Google Maps API after our script -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_API_KEY; ?>&callback=initMap" async defer></script>
 </body>
 </html>
