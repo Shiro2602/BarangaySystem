@@ -108,9 +108,9 @@ if (isset($_POST['submit_forecast'])) {
             <?php include 'includes/header.php'; ?>
 
             <!-- Main Content -->
-            <div class="col-md-9 col-lg-10 main-content">
-                <div class="container py-4">
-                    <h2 class="mb-4">Population Forecast (ARIMA Model)</h2>
+            <div class="main-content">
+                <div class="container mt-4">
+                    <h2>Population Forecast (ARIMA Model)</h2>
 
                     <?php if ($error_message): ?>
                     <div class="alert alert-danger">
