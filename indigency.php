@@ -299,8 +299,9 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <div id="certificateTemplate" class="print-certificate">
         <div class="certificate-header">
             <h4>Republic of the Philippines</h4>
-            <h5>Province of _______________</h5>
-            <h5>Municipality of _______________</h5>
+            <h5>Province of Cavite</h5>
+            <h5>Municipality of Naic</h5>
+            <h5>Barangay Labac</h5>
             <h4 class="mt-4">OFFICE OF THE BARANGAY CHAIRMAN</h4>
             <h3 class="mt-4">CERTIFICATE OF INDIGENCY</h3>
         </div>
@@ -312,7 +313,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
             
             <p>This certification is being issued upon the request of the above-named person for <strong><span id="print-purpose">_______________</span></strong> purposes.</p>
             
-            <p>Issued this <strong><span id="print-issue-date">_______________</span></strong> at the Barangay Hall, _______________.</p>
+            <p>Issued this <strong><span id="print-issue-date">_______________</span></strong> at the Barangay Hall of Labac.</p>
             
             <p class="mb-4">OR No.: <strong><span id="print-or-number">_______________</span></strong></p>
         </div>
