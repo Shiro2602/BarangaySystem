@@ -31,7 +31,6 @@ if (isset($_GET['id'])) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,6 +40,9 @@ if (isset($_GET['id'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
         .sidebar {
             height: 100vh;
@@ -59,13 +61,23 @@ if (isset($_GET['id'])) {
         .main-content {
             padding: 20px;
         }
+        .select2-container {
+            width: 100% !important;
+        }
+        .select2-container .select2-selection--single,
+        .select2-container .select2-selection--multiple {
+            height: auto;
+            min-height: 38px;
+        }
+        .select2-container--bootstrap-5 .select2-selection {
+            border: 1px solid #dee2e6;
+        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <?php include 'includes/header.php'; ?>
-
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="row">
                     <div class="col-md-12">
@@ -79,7 +91,7 @@ if (isset($_GET['id'])) {
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table table-striped">
+                                    <table class="table table-striped" id="householdTable">
                                         <thead>
                                             <tr>
                                                 <th>Household Head</th>
@@ -168,39 +180,94 @@ if (isset($_GET['id'])) {
                         <div class="mb-3">
                             <label for="household_head" class="form-label">Household Head</label>
                             <select class="form-select" name="household_head" id="household_head" required>
-                                <option value="">Select Household Head</option>
+                                <option value=""></option>
                                 <?php
                                 // Query for household head (only those without household)
-                                $head_query = "SELECT id, first_name, last_name FROM residents WHERE household_id IS NULL";
+                                $head_query = "SELECT 
+                                    r.id, 
+                                    CONCAT(
+                                        COALESCE(r.last_name, ''), 
+                                        CASE 
+                                            WHEN r.last_name IS NOT NULL AND r.first_name IS NOT NULL THEN ', '
+                                            ELSE ''
+                                        END,
+                                        COALESCE(r.first_name, ''),
+                                        CASE 
+                                            WHEN r.first_name IS NOT NULL AND r.middle_name IS NOT NULL THEN ' '
+                                            ELSE ''
+                                        END,
+                                        COALESCE(r.middle_name, ''),
+                                        CASE 
+                                            WHEN r.household_id IS NOT NULL THEN ' (Has Household)'
+                                            ELSE ''
+                                        END
+                                    ) as full_name,
+                                    r.household_id
+                                    FROM residents r 
+                                    WHERE COALESCE(r.last_name, '') != '' OR COALESCE(r.first_name, '') != ''
+                                    ORDER BY r.household_id IS NULL DESC, r.last_name, r.first_name";
                                 $head_result = mysqli_query($conn, $head_query);
                                 while ($resident = mysqli_fetch_assoc($head_result)) {
-                                    echo "<option value='" . $resident['id'] . "'>" . 
-                                         htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']) . "</option>";
+                                    if (trim($resident['full_name']) !== '') {
+                                        $disabled = $resident['household_id'] ? 'disabled' : '';
+                                        echo "<option value='" . $resident['id'] . "' " . $disabled . ">" . 
+                                             htmlspecialchars(trim($resident['full_name'])) . "</option>";
+                                    }
                                 }
                                 ?>
                             </select>
+                            <div class="form-text">Search by name. Only residents without existing households can be selected as household head.</div>
                         </div>
                         <div class="mb-3">
                             <label for="household_members" class="form-label">Household Members</label>
                             <select class="form-select" name="household_members[]" id="household_members" multiple>
                                 <?php
                                 // Query for members (all residents)
-                                $members_query = "SELECT id, first_name, last_name, 
-                                    CASE 
-                                        WHEN household_id IS NOT NULL THEN CONCAT(first_name, ' ', last_name, ' (Has Household)') 
-                                        ELSE CONCAT(first_name, ' ', last_name)
-                                    END as display_name 
-                                    FROM residents 
-                                    WHERE id != COALESCE((SELECT household_head_id FROM households WHERE id = household_id), 0)
-                                    ORDER BY household_id IS NULL DESC, first_name, last_name";
+                                $members_query = "SELECT 
+                                    r.id, 
+                                    CONCAT(
+                                        COALESCE(NULLIF(r.last_name, ''), ''),
+                                        CASE WHEN NULLIF(r.last_name, '') IS NOT NULL 
+                                             AND NULLIF(r.first_name, '') IS NOT NULL 
+                                             THEN ', ' 
+                                             ELSE '' 
+                                        END,
+                                        COALESCE(NULLIF(r.first_name, ''), ''),
+                                        CASE WHEN NULLIF(r.first_name, '') IS NOT NULL 
+                                             AND NULLIF(r.middle_name, '') IS NOT NULL 
+                                             THEN ' ' 
+                                             ELSE '' 
+                                        END,
+                                        COALESCE(NULLIF(r.middle_name, ''), ''),
+                                        CASE WHEN r.household_id IS NOT NULL 
+                                             THEN ' (Has Household)' 
+                                             ELSE '' 
+                                        END
+                                    ) as full_name,
+                                    r.household_id
+                                    FROM residents r 
+                                    WHERE (NULLIF(r.last_name, '') IS NOT NULL 
+                                          OR NULLIF(r.first_name, '') IS NOT NULL)
+                                    ORDER BY 
+                                        r.household_id IS NOT NULL,
+                                        COALESCE(r.last_name, ''),
+                                        COALESCE(r.first_name, '')";
+                                
                                 $members_result = mysqli_query($conn, $members_query);
-                                while ($resident = mysqli_fetch_assoc($members_result)) {
-                                    echo "<option value='" . $resident['id'] . "'>" . 
-                                         htmlspecialchars($resident['display_name']) . "</option>";
+                                
+                                if ($members_result) {
+                                    while ($resident = mysqli_fetch_assoc($members_result)) {
+                                        $full_name = trim($resident['full_name']);
+                                        if (!empty($full_name)) {
+                                            $disabled = $resident['household_id'] ? 'disabled' : '';
+                                            echo "<option value='" . htmlspecialchars($resident['id']) . "' " . $disabled . ">" . 
+                                                 htmlspecialchars($full_name) . "</option>";
+                                        }
+                                    }
                                 }
                                 ?>
                             </select>
-                            <div class="form-text">Hold Ctrl (Windows) or Command (Mac) to select multiple members. Members marked with "(Has Household)" are already part of another household.</div>
+                            <div class="form-text">Search and select multiple members. Members with existing households are disabled.</div>
                         </div>
                         <div class="mb-3">
                             <label for="address" class="form-label">Address</label>
@@ -303,11 +370,64 @@ if (isset($_GET['id'])) {
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
             let deleteHouseholdId = null;
+
+            // Initialize Select2 for household head
+            $('#household_head').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select household head',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: $('#addHouseholdModal')
+            });
+
+            // Initialize Select2 for household members with improved configuration
+            $('#household_members').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select members',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: $('#addHouseholdModal'),
+                closeOnSelect: false,
+                selectionAdapter: $.fn.select2.amd.require('select2/selection/multiple'),
+                templateResult: function(data) {
+                    if (!data.id) return data.text;
+                    return $('<span>' + data.text + '</span>');
+                },
+                templateSelection: function(data) {
+                    if (!data.id) return data.text;
+                    return $('<span>' + data.text + '</span>');
+                }
+            });
+
+            // Handle household head change
+            $('#household_head').on('change', function() {
+                var selectedHead = $(this).val();
+                if (selectedHead) {
+                    // Disable the selected head in members dropdown
+                    $('#household_members option[value="' + selectedHead + '"]').prop('disabled', true);
+                }
+                $('#household_members').trigger('change');
+            });
+
+            // Reset Select2 when modal is hidden
+            $('#addHouseholdModal').on('hidden.bs.modal', function () {
+                $('#household_head').val(null).trigger('change');
+                $('#household_members').val(null).trigger('change');
+                $('#address').val('');
+            });
+
+            // Prevent modal from closing when clicking Select2
+            $(document).on('click', '.select2-container--open', function (e) {
+                e.stopPropagation();
+            });
 
             // Add Household Form Submission
             $('#addHouseholdForm').on('submit', function(e) {
@@ -548,6 +668,17 @@ if (isset($_GET['id'])) {
                         alert('Error updating household');
                     }
                 });
+            });
+
+            // Initialize DataTable
+            $('#householdTable').DataTable({
+                columnDefs: [
+                    { targets: [2, 3], orderable: false } // Disable sorting for member count and actions columns
+                ],
+                order: [[0, 'asc']], // Sort by household head by default
+                language: {
+                    search: "Search Households:"
+                }
             });
         });
     </script>

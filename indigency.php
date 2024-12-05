@@ -115,7 +115,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     <div class="col-12">
                         <h2>Indigency Certificates</h2>
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addIndigencyModal">
-                            <i class="fas fa-plus"></i> Add Indigency
+                            <i class="fas fa-plus"></i> Request Indigency
                         </button>
                     </div>
                 </div>

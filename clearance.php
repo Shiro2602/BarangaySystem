@@ -58,13 +58,14 @@ $result = $conn->query($query);
 $clearances = $result->fetch_all(MYSQLI_ASSOC);
 
 // Get all residents for the dropdown
-$residents_query = "SELECT id, CONCAT(first_name, ' ', last_name) as full_name 
-                   FROM residents 
-                   ORDER BY last_name, first_name";
+$residents_query = "SELECT 
+    id,
+    CONCAT(last_name, ', ', first_name, ' ', COALESCE(middle_name, '')) as full_name
+    FROM residents 
+    ORDER BY last_name, first_name";
 $residents_result = $conn->query($residents_query);
 $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -74,6 +75,8 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <link href="css/print.css" rel="stylesheet">
     <style>
         .sidebar {
@@ -92,6 +95,35 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         }
         .main-content {
             padding: 20px;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+        /* Select2 Custom Styles */
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single {
+            height: 38px;
+            padding: 0;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding: 5px 12px;
+            line-height: 26px;
+            color: #212529;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            height: 36px;
+            position: absolute;
+            right: 3px;
+            width: 20px;
+        }
+        .select2-container--bootstrap-5 .select2-dropdown .select2-results__option {
+            padding: 6px 12px;
+        }
+        .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+            padding: 6px 12px;
+            border: 1px solid #ced4da;
         }
         .print-certificate {
             width: 8.5in;
@@ -115,7 +147,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <div class="container-fluid">
         <div class="row">
             <?php require_once __DIR__ . '/includes/header.php'; ?>
-
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="row mb-4">
                     <div class="col-12">
@@ -190,10 +221,12 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     <div class="modal-body">
                         <div class="mb-3">
                             <label>Resident</label>
-                            <select name="resident_id" class="form-control" required>
-                                <option value="">Select Resident</option>
+                            <select name="resident_id" class="form-select select2" required>
+                                <option value="">Search for resident...</option>
                                 <?php foreach ($residents as $resident): ?>
-                                    <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
+                                    <option value="<?= htmlspecialchars($resident['id']) ?>">
+                                        <?= htmlspecialchars($resident['full_name']) ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -297,9 +330,11 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label>Resident</label>
-                                <select name="resident_id" id="edit_resident_id" class="form-control" required>
+                                <select name="resident_id" id="edit_resident_id" class="form-select select2" required>
                                     <?php foreach ($residents as $resident): ?>
-                                        <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
+                                        <option value="<?= htmlspecialchars($resident['id']) ?>">
+                                            <?= htmlspecialchars($resident['full_name']) ?>
+                                        </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -406,10 +441,27 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
             // Initialize DataTable
-            var table = $('#clearanceTable').DataTable();
+            $('#clearanceTable').DataTable();
+
+            // Initialize Select2 for all select2 elements
+            $('.select2').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: $(this).closest('.modal'),
+                    placeholder: 'Search for resident...'
+                });
+            });
+
+            // Reset form when modal is hidden
+            $('.modal').on('hidden.bs.modal', function() {
+                $(this).find('form').trigger('reset');
+                $(this).find('.select2').val('').trigger('change');
+            });
 
             // View Clearance
             $('.view-clearance').click(function() {

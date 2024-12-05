@@ -62,7 +62,6 @@ if (isset($_POST['delete_resident'])) {
 $result = $conn->query("SELECT * FROM residents ORDER BY last_name, first_name");
 $residents = $result->fetch_all(MYSQLI_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -96,7 +95,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
     <div class="container-fluid">
         <div class="row">
             <?php require_once __DIR__ . '/includes/header.php'; ?>
-
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="row mb-4">
                     <div class="col-12">
@@ -112,7 +110,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     <table id="residentsTable" class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Name</th>
                                 <th>Birthdate</th>
                                 <th>Gender</th>
@@ -124,7 +121,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                         <tbody>
                             <?php foreach ($residents as $resident): ?>
                             <tr>
-                                <td><?= $resident['id'] ?></td>
                                 <td><?= $resident['last_name'] . ', ' . $resident['first_name'] . ' ' . $resident['middle_name'] ?></td>
                                 <td><?= $resident['birthdate'] ?></td>
                                 <td><?= $resident['gender'] ?></td>
@@ -390,7 +386,11 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
     <script>
         $(document).ready(function() {
             // Initialize DataTable
-            var table = $('#residentsTable').DataTable();
+            var table = $('#residentsTable').DataTable({
+                columnDefs: [
+                    { targets: [1, 2, 3, 4, 5], orderable: false }, // Disable sorting for all columns except name (index 0)
+                ]
+            });
 
             // View Resident
             $('.view-resident').click(function() {
