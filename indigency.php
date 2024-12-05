@@ -67,8 +67,9 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <title>Indigency Certificates - Barangay Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <link href="css/print.css" rel="stylesheet">
     <style>
         .sidebar {
@@ -88,40 +89,33 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         .main-content {
             padding: 20px;
         }
-        .print-certificate {
-            width: 8.5in;
-            height: 11in;
-            padding: 0.5in;
-            margin: auto;
-            border: 1px solid #ddd;
-            display: none;
-        }
-        @media print {
-            .print-certificate {
-                display: block;
-            }
-            .no-print {
-                display: none;
-            }
+        .select2-container {
+            width: 100% !important;
         }
         /* Select2 Custom Styles */
-        .select2-container--default .select2-selection--single {
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single {
             height: 38px;
-            border: 1px solid #ced4da;
-            border-radius: 0.25rem;
+            padding: 0;
         }
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 38px;
-            padding-left: 12px;
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding: 5px 12px;
+            line-height: 26px;
+            color: #212529;
         }
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
             height: 36px;
+            position: absolute;
+            right: 3px;
+            width: 20px;
         }
-        .select2-dropdown {
-            border: 1px solid #ced4da;
+        .select2-container--bootstrap-5 .select2-dropdown .select2-results__option {
+            padding: 6px 12px;
         }
-        .select2-search--dropdown .select2-search__field {
-            padding: 8px;
+        .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+            padding: 6px 12px;
             border: 1px solid #ced4da;
         }
     </style>
@@ -200,11 +194,13 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 <form method="POST">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="resident_id" class="form-label">Resident</label>
-                            <select class="form-select select2-residents" id="resident_id" name="resident_id" required style="width: 100%;">
-                                <option value="">Select Resident</option>
+                            <label>Resident</label>
+                            <select name="resident_id" class="form-select select2" required>
+                                <option value="">Search for resident...</option>
                                 <?php foreach ($residents as $resident): ?>
-                                    <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
+                                    <option value="<?= htmlspecialchars($resident['id']) ?>">
+                                        <?= htmlspecialchars($resident['full_name']) ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -356,17 +352,20 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         $(document).ready(function() {
             $('#indigencyTable').DataTable();
 
-            // Initialize Select2 for resident dropdown
-            $('.select2-residents').select2({
-                dropdownParent: $('#addIndigencyModal'),
-                placeholder: 'Search for a resident...',
-                allowClear: true,
-                width: '100%'
+            // Initialize Select2 for all select2 elements
+            $('.select2').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: $(this).closest('.modal'),
+                    placeholder: 'Search for resident...'
+                });
             });
 
-            // Reset Select2 when modal is closed
-            $('#addIndigencyModal').on('hidden.bs.modal', function () {
-                $('.select2-residents').val(null).trigger('change');
+            // Reset form when modal is hidden
+            $('.modal').on('hidden.bs.modal', function() {
+                $(this).find('form').trigger('reset');
+                $(this).find('.select2').val('').trigger('change');
             });
 
             $('.edit-indigency').click(function() {
