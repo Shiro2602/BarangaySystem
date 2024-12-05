@@ -44,7 +44,7 @@ if (isset($_POST['delete_indigency'])) {
 }
 
 // Get all indigency certificates with resident information
-$query = "SELECT i.*, CONCAT(r.first_name, ' ', r.last_name) as resident_name 
+$query = "SELECT i.*, CONCAT(r.first_name, ' ', r.last_name) as full_name 
           FROM indigency i 
           LEFT JOIN residents r ON i.resident_id = r.id 
           ORDER BY i.issue_date DESC";
@@ -140,7 +140,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     <table id="indigencyTable" class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Resident</th>
                                 <th>Purpose</th>
                                 <th>Issue Date</th>
@@ -151,16 +150,14 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                         </thead>
                         <tbody>
                             <?php foreach ($certificates as $certificate): ?>
-                            <tr data-id="<?= $certificate['id'] ?>">
-                                <td><?= $certificate['id'] ?></td>
-                                <td class="resident-name"><?= $certificate['resident_name'] ?></td>
-                                <td class="purpose"><?= $certificate['purpose'] ?></td>
-                                <td class="issue-date"><?= $certificate['issue_date'] ?></td>
-                                <td class="or-number"><?= $certificate['or_number'] ?></td>
+                            <tr>
+                                <td><?= htmlspecialchars($certificate['full_name']) ?></td>
+                                <td><?= htmlspecialchars($certificate['purpose']) ?></td>
+                                <td><?= htmlspecialchars($certificate['issue_date']) ?></td>
+                                <td><?= htmlspecialchars($certificate['or_number']) ?></td>
                                 <td>
-                                    <span class="badge bg-<?= $certificate['status'] == 'Approved' ? 'success' : 
-                                        ($certificate['status'] == 'Rejected' ? 'danger' : 'warning') ?>">
-                                        <?= $certificate['status'] ?>
+                                    <span class="badge <?= $certificate['status'] === 'Approved' ? 'bg-success' : ($certificate['status'] === 'Rejected' ? 'bg-danger' : 'bg-warning') ?>">
+                                        <?= htmlspecialchars($certificate['status']) ?>
                                     </span>
                                 </td>
                                 <td>
@@ -350,7 +347,16 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('#indigencyTable').DataTable();
+            // Initialize DataTable
+            $('#indigencyTable').DataTable({
+                columnDefs: [
+                    { targets: [1, 2, 3, 4, 5], orderable: false } // Disable sorting for all columns except resident name (index 0)
+                ],
+                order: [[0, 'asc']], // Sort by resident name by default
+                language: {
+                    search: "Search Certificate:"
+                }
+            });
 
             // Initialize Select2 for all select2 elements
             $('.select2').each(function() {
@@ -391,10 +397,10 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 var row = $(this).closest('tr');
                 
                 // Get the data from the row
-                var residentName = row.find('td:eq(1)').text().trim();
-                var purpose = row.find('td:eq(2)').text().trim();
-                var issueDate = new Date(row.find('td:eq(3)').text().trim()).toLocaleDateString();
-                var orNumber = row.find('td:eq(4)').text().trim();
+                var residentName = row.find('td:eq(0)').text().trim();
+                var purpose = row.find('td:eq(1)').text().trim();
+                var issueDate = new Date(row.find('td:eq(2)').text().trim()).toLocaleDateString();
+                var orNumber = row.find('td:eq(3)').text().trim();
 
                 // Update the certificate template
                 $('#print-resident-name').text(residentName);
