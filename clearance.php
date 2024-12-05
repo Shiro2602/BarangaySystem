@@ -162,7 +162,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     <table id="clearanceTable" class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Resident</th>
                                 <th>Purpose</th>
                                 <th>Issue Date</th>
@@ -176,7 +175,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                         <tbody>
                             <?php foreach ($clearances as $clearance): ?>
                             <tr data-id="<?= $clearance['id'] ?>">
-                                <td><?= $clearance['id'] ?></td>
                                 <td class="resident-name"><?= htmlspecialchars($clearance['resident_name']) ?></td>
                                 <td class="purpose"><?= htmlspecialchars($clearance['purpose']) ?></td>
                                 <td class="issue-date"><?= $clearance['issue_date'] ?></td>
@@ -190,6 +188,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                     </span>
                                 </td>
                                 <td>
+                                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
                                     <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
@@ -199,6 +198,8 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                     <button class="btn btn-sm btn-danger delete-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteClearanceModal" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <?php else: ?>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -242,14 +243,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                             <label>Amount</label>
                             <input type="number" name="amount" class="form-control" step="0.01" required>
                         </div>
-                        <div class="mb-3">
-                            <label>Status</label>
-                            <select name="status" class="form-control" required>
-                                <option value="Pending">Pending</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
-                            </select>
-                        </div>
+                        <input type="hidden" name="status" value="Pending">
                         <div class="mb-3">
                             <label>Issue Date</label>
                             <input type="date" name="issue_date" class="form-control" required>
@@ -445,7 +439,15 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <script>
         $(document).ready(function() {
             // Initialize DataTable
-            $('#clearanceTable').DataTable();
+            $('#clearanceTable').DataTable({
+                columnDefs: [
+                    { targets: [1, 2, 3, 4, 5, 6, 7], orderable: false } // Disable sorting for all columns except resident name (index 0)
+                ],
+                order: [[0, 'asc']], // Sort by resident name by default
+                language: {
+                    search: "Search Clearance:"
+                }
+            });
 
             // Initialize Select2 for all select2 elements
             $('.select2').each(function() {
@@ -480,7 +482,8 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 }
             });
 
-            // Edit Clearance
+            <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            // Admin-only event handlers
             $('.edit-clearance').click(function() {
                 var id = $(this).data('id');
                 var row = $(this).closest('tr');
@@ -498,22 +501,21 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 }
             });
 
-            // Delete Clearance
             $('.delete-clearance').click(function() {
                 var id = $(this).data('id');
                 $('#delete_clearance_id').val(id);
             });
 
-            // Print Clearance
+            // Print function - admin only
             $('.print-clearance').click(function() {
                 var row = $(this).closest('tr');
                 
                 // Get the data from the row
-                var residentName = row.find('td:eq(1)').text().trim();
-                var purpose = row.find('td:eq(2)').text().trim();
-                var issueDate = new Date(row.find('td:eq(3)').text().trim()).toLocaleDateString();
-                var orNumber = row.find('td:eq(5)').text().trim();
-                var amount = row.find('td:eq(6)').text().trim();
+                var residentName = row.find('td:eq(0)').text().trim();
+                var purpose = row.find('td:eq(1)').text().trim();
+                var issueDate = new Date(row.find('td:eq(2)').text().trim()).toLocaleDateString();
+                var orNumber = row.find('td:eq(4)').text().trim();
+                var amount = row.find('td:eq(5)').text().trim();
 
                 // Update the certificate template
                 $('#print-resident-name').text(residentName);
@@ -525,6 +527,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 // Print
                 window.print();
             });
+            <?php endif; ?>
         });
     </script>
 </body>

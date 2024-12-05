@@ -19,7 +19,7 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crime Map - Barangay Labac</title>
+    <title>Crime Map</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -138,8 +138,7 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
 
             <div class="col main-content">
                 <div class="page-title">
-                    <h2>Crime Map - Barangay Labac</h2>
-                    <p class="text-muted">Interactive map showing reported incidents in Barangay Labac, Naic, Cavite</p>
+                    <h2>Crime Map</h2>
                 </div>
 
                 <!-- Filters -->

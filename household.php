@@ -673,7 +673,7 @@ if (isset($_GET['id'])) {
             // Initialize DataTable
             $('#householdTable').DataTable({
                 columnDefs: [
-                    { targets: [2, 3], orderable: false } // Disable sorting for member count and actions columns
+                    { targets: [1, 2, 3], orderable: false } // Disable sorting for all columns except household head (index 0)
                 ],
                 order: [[0, 'asc']], // Sort by household head by default
                 language: {
