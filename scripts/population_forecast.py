@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.stattools import adfuller
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error, mean_squared_error
 import itertools
 import sys
 import json
 import warnings
-import pmdarima as pm  # Add this import for auto_arima functionality
 warnings.filterwarnings('ignore')
 
 def calculate_forecast_metrics(actual, predicted):
@@ -22,7 +21,7 @@ def calculate_forecast_metrics(actual, predicted):
     # Tracking metrics
     metrics['tracking_signal'] = round(np.sum(actual - predicted) / (len(actual) * metrics['mae']), 2)
     
-    # Theil's U statistic (compare with naive forecast)
+    # Theil's U statistic
     naive_forecast = np.roll(actual, 1)[1:]
     actual_changes = actual[1:]
     mse_model = np.mean((actual_changes - predicted[:-1])**2)
@@ -31,9 +30,9 @@ def calculate_forecast_metrics(actual, predicted):
     
     return metrics
 
-def find_best_arima_params(data):
-    """Find the best ARIMA parameters using a more robust approach"""
-    # Calculate growth rate and trend strength (keep existing code)
+def find_best_sarima_params(data):
+    """Find the best SARIMA parameters using grid search"""
+    # Calculate growth rate and trend strength
     growth_rates = np.diff(data) / data[:-1]
     trend_strength = np.abs(np.mean(growth_rates))
     
@@ -41,147 +40,173 @@ def find_best_arima_params(data):
     adf_result = adfuller(data)
     is_stationary = adf_result[1] < 0.05
     
-    # Use auto_arima for intelligent parameter selection
+    # Set parameter ranges
+    if is_stationary:
+        p_range = range(0, 3)
+        d_range = [0]
+        q_range = range(0, 3)
+    else:
+        p_range = range(0, 3)
+        d_range = [1]
+        q_range = range(0, 3)
+    
+    # Seasonal parameters
+    P_range = range(0, 2)
+    D_range = [0]
+    Q_range = range(0, 2)
+    s = 3  # Try different seasonal periods (3-5 years is common for population data)
+    
+    best_aic = float('inf')
+    best_model = None
+    best_order = None
+    best_seasonal_order = None
+    
     try:
-        # Set parameter ranges based on data characteristics
-        max_p = 3 if trend_strength > 0.1 else 4
-        max_d = 1 if not is_stationary else 0
-        max_q = 3
+        # Grid search for both regular and seasonal parameters
+        for p, d, q in itertools.product(p_range, d_range, q_range):
+            for P, D, Q in itertools.product(P_range, D_range, Q_range):
+                if p + d + q + P + D + Q <= 6:  # Limit model complexity
+                    try:
+                        model = SARIMAX(
+                            data,
+                            order=(p, d, q),
+                            seasonal_order=(P, D, Q, s),
+                            enforce_stationarity=False,
+                            enforce_invertibility=False
+                        ).fit(disp=False)
+                        
+                        if model.aic < best_aic:
+                            best_aic = model.aic
+                            best_model = model
+                            best_order = (p, d, q)
+                            best_seasonal_order = (P, D, Q, s)
+                    except:
+                        continue
         
-        model = pm.auto_arima(
-            data,
-            start_p=0, max_p=max_p,
-            start_q=0, max_q=max_q,
-            d=max_d,
-            seasonal=False,  # Set to True if dealing with seasonal data
-            stepwise=True,
-            suppress_warnings=True,
-            error_action='ignore',
-            max_order=6,  # Limit total parameters
-            information_criterion='aic',
-            cv=3  # Use cross-validation
-        )
+        if best_model is None:
+            # Fallback to simple model
+            best_model = SARIMAX(
+                data,
+                order=(1, 1 if not is_stationary else 0, 1),
+                seasonal_order=(1, 0, 1, s)
+            ).fit(disp=False)
+            best_order = (1, 1 if not is_stationary else 0, 1)
+            best_seasonal_order = (1, 0, 1, s)
         
-        return model, model.order
+        return best_model, best_order, best_seasonal_order
         
     except Exception as e:
-        # Fallback to simple models if auto_arima fails
-        fallback_order = (1, 1, 1) if trend_strength > 0.05 else (1, 0, 1)
-        try:
-            model = ARIMA(data, order=fallback_order).fit()
-            return model, fallback_order
-        except:
-            # Ultimate fallback to simplest model
-            model = ARIMA(data, order=(1, 0, 0)).fit()
-            return model, (1, 0, 0)
+        # Ultimate fallback
+        model = SARIMAX(data, order=(1, 0, 0), seasonal_order=(0, 0, 0, s)).fit(disp=False)
+        return model, (1, 0, 0), (0, 0, 0, s)
+
+def apply_population_dynamics(forecast, historical_data):
+    """Apply realistic population dynamics constraints"""
+    
+    # Calculate historical statistics
+    historical_mean = np.mean(historical_data)
+    historical_std = np.std(historical_data)
+    
+    # Define reasonable bounds
+    upper_bound = historical_mean + 2 * historical_std
+    lower_bound = max(historical_mean - 2 * historical_std, historical_data[-1] * 0.8)
+    
+    # Apply bounds with smoothing
+    constrained_forecast = np.copy(forecast)
+    for i in range(len(forecast)):
+        # Gradually tighten bounds over time
+        time_factor = (i + 1) / len(forecast)
+        current_upper = historical_data[-1] + (upper_bound - historical_data[-1]) * (1 - time_factor * 0.5)
+        current_lower = historical_data[-1] + (lower_bound - historical_data[-1]) * (1 - time_factor * 0.5)
+        
+        # Apply constraints
+        constrained_forecast[i] = np.clip(forecast[i], current_lower, current_upper)
+    
+    return constrained_forecast
 
 def perform_forecast(data_file, forecast_years=5):
     try:
         # Read the CSV file
         df = pd.read_csv(data_file)
         
-        # Ensure the dataframe has 'year' and 'population' columns
+        # Validation checks
         required_columns = ['year', 'population']
         if not all(col in df.columns for col in required_columns):
             return json.dumps({
                 'error': 'CSV file must contain "year" and "population" columns'
             })
 
-        # Convert to numeric and handle any non-numeric values
+        # Data preprocessing
         df['population'] = pd.to_numeric(df['population'], errors='coerce')
         df = df.dropna()
         df = df.sort_values('year')
         
-        # Add data validation
         if len(df) < 4:
             return json.dumps({
                 'error': 'Insufficient data points for forecasting (minimum 4 required)'
             })
             
-        # Check for gaps in years
-        years = df['year'].values
-        if np.any(np.diff(years) != 1):
-            return json.dumps({
-                'error': 'Data must contain consecutive years without gaps'
-            })
+        # Handle gaps in years
+        full_year_range = pd.DataFrame({'year': range(df['year'].min(), df['year'].max() + 1)})
+        df = pd.merge(full_year_range, df, on='year', how='left')
+        df['population'] = df['population'].interpolate(method='linear')
         
-        # Prepare data for ARIMA
+        # Prepare data
         y = df['population'].values
         
-        # Find best ARIMA model
-        best_model, best_params = find_best_arima_params(y)
+        # Calculate historical statistics
+        historical_growth = np.mean(np.diff(y) / y[:-1])
+        historical_volatility = np.std(np.diff(y) / y[:-1])
         
-        # Generate multiple forecasts and confidence intervals
-        n_simulations = 100
-        forecasts = np.zeros((n_simulations, forecast_years))
+        # Find best SARIMA model
+        best_model, best_order, best_seasonal_order = find_best_sarima_params(y)
         
-        for i in range(n_simulations):
-            # Generate forecast with random variation
-            base_forecast = best_model.simulate(nsimulations=forecast_years, anchor='end')
-            
-            # Apply growth constraints with some randomness
-            last_value = y[-1]
-            for j in range(len(base_forecast)):
-                # Add controlled randomness to growth limits
-                random_factor = np.random.normal(1, 0.2)  # 20% variation
-                if abs(trend_info['trend_consistency']) > 0.7:
-                    # Strong trend - allow it to continue but with dampening
-                    max_growth = min(0.1, historical_growth * 1.5) * random_factor
-                    min_growth = max(-0.1, historical_growth * 0.5) * random_factor
-                else:
-                    # Weak or inconsistent trend - more conservative constraints
-                    max_growth = min(0.05, abs(historical_growth) + historical_volatility) * random_factor
-                    min_growth = max(-0.05, -abs(historical_growth) - historical_volatility) * random_factor
-                
-                # Calculate growth rate
-                growth = (base_forecast[j] - last_value) / last_value
-                
-                # Apply constraints with smoothing
-                if growth > max_growth:
-                    base_forecast[j] = last_value * (1 + max_growth)
-                elif growth < min_growth:
-                    base_forecast[j] = last_value * (1 + min_growth)
-                
-                # Add small random variation
-                variation = np.random.normal(0, historical_volatility * 0.5)
-                base_forecast[j] *= (1 + variation)
-                
-                last_value = base_forecast[j]
-            
-            forecasts[i] = base_forecast
+        # Generate forecasts
+        forecast = best_model.forecast(steps=forecast_years)
         
-        # Calculate final forecast as median of simulations
-        forecast = np.median(forecasts, axis=0)
-        forecast_ci = np.percentile(forecasts, [5, 95], axis=0).T
+        # Apply population dynamics constraints
+        forecast = apply_population_dynamics(forecast, y)
         
-        # Ensure forecasts are positive and reasonable
-        forecast = np.maximum(forecast, y[-1] * 0.5)  # Don't allow drops below 50% of last value
-        forecast_ci = np.maximum(forecast_ci, y[-1] * 0.5)
+        # Generate confidence intervals
+        forecast_std_err = np.sqrt(best_model.cov_params().diagonal())
+        z_score = 1.96  # 95% confidence interval
         
-        # Prepare forecast data with confidence intervals
+        # Calculate confidence intervals
+        forecast_ci_lower = forecast - (z_score * forecast_std_err[0])
+        forecast_ci_upper = forecast + (z_score * forecast_std_err[0])
+        
+        # Ensure forecasts and CIs are positive and reasonable
+        forecast = np.maximum(forecast, y[-1] * 0.5)
+        forecast_ci_lower = np.maximum(forecast_ci_lower, y[-1] * 0.5)
+        forecast_ci_upper = np.maximum(forecast_ci_upper, forecast)
+        
+        # Prepare forecast data
         last_year = df['year'].max()
         future_years = range(last_year + 1, last_year + forecast_years + 1)
         forecast_df = pd.DataFrame({
             'year': future_years,
             'population': forecast.round().astype(int),
-            'lower_ci': forecast_ci[:, 0].round().astype(int),
-            'upper_ci': forecast_ci[:, 1].round().astype(int)
+            'lower_ci': forecast_ci_lower.round().astype(int),
+            'upper_ci': forecast_ci_upper.round().astype(int)
         })
         
         # Calculate metrics
         metrics = calculate_forecast_metrics(y, best_model.fittedvalues)
-        metrics['model_type'] = f'ARIMA{best_params}'
+        metrics['model_type'] = f'SARIMA{best_order}x{best_seasonal_order}'
         
-        # Calculate growth rates
+        # Growth rates and trend analysis
         total_growth = (forecast[-1] - y[-1]) / y[-1] * 100
         avg_annual_growth = (((forecast[-1] / y[-1]) ** (1/forecast_years)) - 1) * 100
         metrics['total_growth_percent'] = round(total_growth, 2)
         metrics['avg_annual_growth_percent'] = round(avg_annual_growth, 2)
-        
-        # Add trend analysis
         metrics['trend'] = 'Increasing' if total_growth > 0 else 'Decreasing' if total_growth < 0 else 'Stable'
         metrics['forecast_reliability'] = 'High' if metrics['mape'] < 10 else 'Medium' if metrics['mape'] < 20 else 'Low'
         
+        # Add warning if interpolation was used
+        gaps_filled = len(full_year_range) - len(df['year'].unique())
+        if gaps_filled > 0:
+            metrics['warnings'] = f'Filled {gaps_filled} missing years with linear interpolation'
+            
         # Prepare response
         result = {
             'historical': df[['year', 'population']].to_dict('records'),
