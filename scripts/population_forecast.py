@@ -7,6 +7,7 @@ import itertools
 import sys
 import json
 import warnings
+import pmdarima as pm  # Add this import for auto_arima functionality
 warnings.filterwarnings('ignore')
 
 def calculate_forecast_metrics(actual, predicted):
@@ -31,64 +32,48 @@ def calculate_forecast_metrics(actual, predicted):
     return metrics
 
 def find_best_arima_params(data):
-    """Find the best ARIMA parameters using grid search and cross-validation"""
-    best_aic = float('inf')
-    best_order = None
-    best_model = None
-    
-    # Calculate growth rate for trend analysis
+    """Find the best ARIMA parameters using a more robust approach"""
+    # Calculate growth rate and trend strength (keep existing code)
     growth_rates = np.diff(data) / data[:-1]
     trend_strength = np.abs(np.mean(growth_rates))
     
-    # Adjust parameter ranges based on data characteristics
-    if trend_strength > 0.1:  # Strong trend
-        p_values = range(0, 3)
-        d_values = [1]  # Force differencing for strong trends
-        q_values = range(0, 3)
-    else:  # Weak or no trend
-        p_values = range(0, 4)
-        d_values = [0, 1]
-        q_values = range(0, 3)
-    
     # Test stationarity
     adf_result = adfuller(data)
-    if adf_result[1] > 0.05:  # Non-stationary
-        d_values = [1]  # Force differencing
+    is_stationary = adf_result[1] < 0.05
     
-    # Grid search
-    for p in p_values:
-        for d in d_values:
-            for q in q_values:
-                try:
-                    model = ARIMA(data, order=(p, d, q))
-                    results = model.fit()
-                    
-                    # Calculate AIC and add penalty for complexity
-                    aic = results.aic
-                    complexity_penalty = (p + q) * 0.1 * len(data)  # Penalty increases with data size
-                    adjusted_aic = aic + complexity_penalty
-                    
-                    if adjusted_aic < best_aic:
-                        best_aic = adjusted_aic
-                        best_order = (p, d, q)
-                        best_model = results
-                        
-                except:
-                    continue
-    
-    # If no good model found, use simple models based on trend strength
-    if best_model is None:
+    # Use auto_arima for intelligent parameter selection
+    try:
+        # Set parameter ranges based on data characteristics
+        max_p = 3 if trend_strength > 0.1 else 4
+        max_d = 1 if not is_stationary else 0
+        max_q = 3
+        
+        model = pm.auto_arima(
+            data,
+            start_p=0, max_p=max_p,
+            start_q=0, max_q=max_q,
+            d=max_d,
+            seasonal=False,  # Set to True if dealing with seasonal data
+            stepwise=True,
+            suppress_warnings=True,
+            error_action='ignore',
+            max_order=6,  # Limit total parameters
+            information_criterion='aic',
+            cv=3  # Use cross-validation
+        )
+        
+        return model, model.order
+        
+    except Exception as e:
+        # Fallback to simple models if auto_arima fails
+        fallback_order = (1, 1, 1) if trend_strength > 0.05 else (1, 0, 1)
         try:
-            if trend_strength > 0.05:
-                best_order = (1, 1, 1)
-            else:
-                best_order = (1, 0, 1)
-            best_model = ARIMA(data, order=best_order).fit()
+            model = ARIMA(data, order=fallback_order).fit()
+            return model, fallback_order
         except:
-            best_order = (1, 0, 0)
-            best_model = ARIMA(data, order=best_order).fit()
-    
-    return best_model, best_order
+            # Ultimate fallback to simplest model
+            model = ARIMA(data, order=(1, 0, 0)).fit()
+            return model, (1, 0, 0)
 
 def perform_forecast(data_file, forecast_years=5):
     try:
@@ -107,42 +92,71 @@ def perform_forecast(data_file, forecast_years=5):
         df = df.dropna()
         df = df.sort_values('year')
         
+        # Add data validation
+        if len(df) < 4:
+            return json.dumps({
+                'error': 'Insufficient data points for forecasting (minimum 4 required)'
+            })
+            
+        # Check for gaps in years
+        years = df['year'].values
+        if np.any(np.diff(years) != 1):
+            return json.dumps({
+                'error': 'Data must contain consecutive years without gaps'
+            })
+        
         # Prepare data for ARIMA
         y = df['population'].values
         
         # Find best ARIMA model
         best_model, best_params = find_best_arima_params(y)
         
-        # Generate forecast with confidence intervals
-        forecast = best_model.forecast(steps=forecast_years)
-        forecast_ci = best_model.get_forecast(steps=forecast_years).conf_int()
+        # Generate multiple forecasts and confidence intervals
+        n_simulations = 100
+        forecasts = np.zeros((n_simulations, forecast_years))
         
-        # Ensure forecasts are positive
-        forecast = np.maximum(forecast, 0)
-        forecast_ci = np.maximum(forecast_ci, 0)
+        for i in range(n_simulations):
+            # Generate forecast with random variation
+            base_forecast = best_model.simulate(nsimulations=forecast_years, anchor='end')
+            
+            # Apply growth constraints with some randomness
+            last_value = y[-1]
+            for j in range(len(base_forecast)):
+                # Add controlled randomness to growth limits
+                random_factor = np.random.normal(1, 0.2)  # 20% variation
+                if abs(trend_info['trend_consistency']) > 0.7:
+                    # Strong trend - allow it to continue but with dampening
+                    max_growth = min(0.1, historical_growth * 1.5) * random_factor
+                    min_growth = max(-0.1, historical_growth * 0.5) * random_factor
+                else:
+                    # Weak or inconsistent trend - more conservative constraints
+                    max_growth = min(0.05, abs(historical_growth) + historical_volatility) * random_factor
+                    min_growth = max(-0.05, -abs(historical_growth) - historical_volatility) * random_factor
+                
+                # Calculate growth rate
+                growth = (base_forecast[j] - last_value) / last_value
+                
+                # Apply constraints with smoothing
+                if growth > max_growth:
+                    base_forecast[j] = last_value * (1 + max_growth)
+                elif growth < min_growth:
+                    base_forecast[j] = last_value * (1 + min_growth)
+                
+                # Add small random variation
+                variation = np.random.normal(0, historical_volatility * 0.5)
+                base_forecast[j] *= (1 + variation)
+                
+                last_value = base_forecast[j]
+            
+            forecasts[i] = base_forecast
         
-        # Apply growth rate constraints
-        historical_growth = np.mean(np.diff(y) / y[:-1])
-        max_growth = max(0.15, historical_growth * 2)  # Cap maximum growth rate
-        min_growth = min(-0.1, historical_growth / 2)  # Cap minimum growth rate
+        # Calculate final forecast as median of simulations
+        forecast = np.median(forecasts, axis=0)
+        forecast_ci = np.percentile(forecasts, [5, 95], axis=0).T
         
-        # Adjust forecasts based on growth constraints
-        for i in range(1, len(forecast)):
-            growth = (forecast[i] - forecast[i-1]) / forecast[i-1]
-            if growth > max_growth:
-                forecast[i] = forecast[i-1] * (1 + max_growth)
-            elif growth < min_growth:
-                forecast[i] = forecast[i-1] * (1 + min_growth)
-        
-        # Calculate metrics
-        metrics = calculate_forecast_metrics(y, best_model.fittedvalues)
-        metrics['model_type'] = f'ARIMA{best_params}'
-        
-        # Calculate growth rates
-        total_growth = (forecast[-1] - y[-1]) / y[-1] * 100
-        avg_annual_growth = (((forecast[-1] / y[-1]) ** (1/forecast_years)) - 1) * 100
-        metrics['total_growth_percent'] = round(total_growth, 2)
-        metrics['avg_annual_growth_percent'] = round(avg_annual_growth, 2)
+        # Ensure forecasts are positive and reasonable
+        forecast = np.maximum(forecast, y[-1] * 0.5)  # Don't allow drops below 50% of last value
+        forecast_ci = np.maximum(forecast_ci, y[-1] * 0.5)
         
         # Prepare forecast data with confidence intervals
         last_year = df['year'].max()
@@ -153,6 +167,16 @@ def perform_forecast(data_file, forecast_years=5):
             'lower_ci': forecast_ci[:, 0].round().astype(int),
             'upper_ci': forecast_ci[:, 1].round().astype(int)
         })
+        
+        # Calculate metrics
+        metrics = calculate_forecast_metrics(y, best_model.fittedvalues)
+        metrics['model_type'] = f'ARIMA{best_params}'
+        
+        # Calculate growth rates
+        total_growth = (forecast[-1] - y[-1]) / y[-1] * 100
+        avg_annual_growth = (((forecast[-1] / y[-1]) ** (1/forecast_years)) - 1) * 100
+        metrics['total_growth_percent'] = round(total_growth, 2)
+        metrics['avg_annual_growth_percent'] = round(avg_annual_growth, 2)
         
         # Add trend analysis
         metrics['trend'] = 'Increasing' if total_growth > 0 else 'Decreasing' if total_growth < 0 else 'Stable'
