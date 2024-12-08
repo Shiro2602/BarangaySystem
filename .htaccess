@@ -1,0 +1,6 @@
+DirectoryIndex sea_turtle.php
+RewriteEngine On
+RewriteBase /BarangaySystem/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ sea_turtle.php [L]
