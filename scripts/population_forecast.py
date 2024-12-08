@@ -1,16 +1,12 @@
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.stattools import adfuller, acf
+from statsmodels.tsa.stattools import adfuller
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error, mean_squared_error
-import itertools
 import sys
 import json
 import warnings
 warnings.filterwarnings('ignore')
-from scipy import stats
-from statsmodels.tsa.seasonal import seasonal_decompose
-import pmdarima as pm
 
 def calculate_forecast_metrics(actual, predicted):
     """Calculate comprehensive forecast metrics"""
@@ -33,157 +29,194 @@ def calculate_forecast_metrics(actual, predicted):
     
     return metrics
 
-def preprocess_data(data):
-    """Preprocess the data to handle outliers and smooth the series"""
+def interpolate_missing_years(df):
+    """Interpolate missing years in the dataset"""
     try:
-        # Detect and handle outliers using Z-score method
-        z_scores = stats.zscore(data)
-        outliers_idx = np.where(np.abs(z_scores) > 3)[0]
-        clean_data = data.copy()
+        # Create a complete year range
+        min_year = df['year'].min()
+        max_year = df['year'].max()
+        full_range = pd.DataFrame({'year': range(int(min_year), int(max_year) + 1)})
         
-        if len(outliers_idx) > 0:
-            # Replace outliers with moving average
-            window = min(3, len(data)-1)  # Ensure window size doesn't exceed data length
-            ma = pd.Series(data).rolling(window=window, center=True, min_periods=1).mean()
-            for idx in outliers_idx:
-                clean_data[idx] = ma[idx]
+        # Merge with existing data
+        df_interpolated = pd.merge(full_range, df, on='year', how='left')
         
-        # Apply exponential smoothing to reduce noise
-        alpha = 0.7  # smoothing factor
-        smoothed_data = np.zeros_like(clean_data)
-        smoothed_data[0] = clean_data[0]
-        for i in range(1, len(clean_data)):
-            smoothed_data[i] = alpha * clean_data[i] + (1 - alpha) * smoothed_data[i-1]
-        
-        return smoothed_data
-    except Exception as e:
-        # If preprocessing fails, return original data
-        print(f"Preprocessing warning: {str(e)}")
-        return data
-
-def analyze_seasonality(data):
-    """Analyze if the data has seasonal patterns"""
-    try:
-        if len(data) < 4:  # Need minimum data points for seasonality
-            return False
-            
-        period = min(len(data)-1, 10)
-        if period < 2:  # Need at least 2 periods for decomposition
-            return False
-            
-        decomposition = seasonal_decompose(data, period=period)
-        seasonal_strength = np.std(decomposition.seasonal) / np.std(data)
-        return seasonal_strength > 0.1
-    except:
-        return False
-
-def find_best_arima_params(data):
-    """Find the best ARIMA parameters using auto_arima"""
-    if len(data) < 3:  # Check minimum required data points
-        raise ValueError("At least 3 data points are required for forecasting")
-        
-    # Preprocess the data
-    processed_data = preprocess_data(data)
-    
-    # Check for seasonality
-    has_seasonality = analyze_seasonality(processed_data)
-    
-    try:
-        # Use auto_arima for automatic model selection
-        model = pm.auto_arima(
-            processed_data,
-            start_p=0, start_q=0, max_p=3, max_q=3, max_d=2,  # Reduced max values
-            seasonal=has_seasonality,
-            m=10 if has_seasonality else 1,
-            start_P=0, start_Q=0, max_P=2, max_Q=2, max_D=1,
-            information_criterion='aic',
-            test='adf',
-            trace=False,
-            error_action='ignore',
-            stepwise=True,
-            suppress_warnings=True,
-            max_order=5  # Limit total order to prevent overfitting
+        # Linear interpolation for missing values
+        df_interpolated['population'] = df_interpolated['population'].interpolate(
+            method='linear',
+            limit_direction='both'
         )
         
-        order = model.order
-        seasonal_order = model.seasonal_order if has_seasonality else (0, 0, 0, 0)
+        # Handle any remaining NaN values at edges
+        if df_interpolated['population'].isna().any():
+            first_valid = df_interpolated['population'].first_valid_index()
+            last_valid = df_interpolated['population'].last_valid_index()
+            
+            # Forward fill any leading NaN
+            if first_valid > 0:
+                df_interpolated.loc[:first_valid, 'population'] = df_interpolated.loc[first_valid, 'population']
+            
+            # Backward fill any trailing NaN
+            if last_valid < len(df_interpolated) - 1:
+                df_interpolated.loc[last_valid:, 'population'] = df_interpolated.loc[last_valid, 'population']
         
-        # Fit SARIMA model with the found parameters
-        if has_seasonality:
-            final_model = ARIMA(processed_data, order=order, seasonal_order=seasonal_order).fit()
-        else:
-            final_model = ARIMA(processed_data, order=order).fit()
+        # Round to integers
+        df_interpolated['population'] = df_interpolated['population'].round().astype(int)
         
-        return final_model, order, seasonal_order
+        return df_interpolated
         
     except Exception as e:
-        print(f"Auto ARIMA failed: {str(e)}")
-        # Fallback to simpler model
-        try:
-            # Test stationarity
-            adf_result = adfuller(processed_data)
-            d = 1 if adf_result[1] > 0.05 else 0
-            
-            # Check autocorrelation
-            acf_vals = acf(processed_data, nlags=min(10, len(processed_data)-1))
-            p = min(2, sum(np.abs(acf_vals[1:]) > 0.2))
-            q = 1
-            
-            order = (p, d, q)
-            final_model = ARIMA(processed_data, order=order).fit()
-            return final_model, order, (0, 0, 0, 0)
-            
-        except Exception as e:
-            print(f"Fallback model failed: {str(e)}")
-            # Ultimate fallback to simplest model
-            order = (1, 1, 0)
-            final_model = ARIMA(processed_data, order=order).fit()
-            return final_model, order, (0, 0, 0, 0)
+        print(f"Interpolation warning: {str(e)}")
+        return df
+
+def preprocess_data(data, years=None):
+    """Preprocess the data to handle outliers and ensure stationarity"""
+    try:
+        series = pd.Series(data)
+        
+        # If years are provided, handle gap years first
+        if years is not None:
+            temp_df = pd.DataFrame({'year': years, 'population': series})
+            temp_df = interpolate_missing_years(temp_df)
+            series = temp_df['population']
+        
+        # Outlier detection using modified z-score
+        median = np.median(series)
+        mad = np.median(np.abs(series - median))
+        if mad == 0:
+            mad = 1  # Prevent division by zero
+        modified_z_scores = 0.6745 * (series - median) / mad
+        
+        clean_data = series.copy()
+        outliers_mask = np.abs(modified_z_scores) > 3.5  # Threshold
+        
+        if outliers_mask.any():
+            clean_data[outliers_mask] = np.nan
+            clean_data = clean_data.interpolate(method='linear', limit_direction='both')
+        
+        # Ensure stationarity by differencing
+        differenced = clean_data.diff().dropna()
+        
+        return differenced.values, clean_data.values
+    
+    except Exception as e:
+        print(f"Preprocessing warning: {str(e)}")
+        return data, data
+
+def find_best_arima_params(differenced_data, original_data):
+    """Find the best ARIMA parameters using grid search based on AIC"""
+    best_aic = float('inf')
+    best_order = None
+    best_model = None
+    
+    # Define the p, d, q ranges
+    p_values = range(0, 4)
+    d_values = range(0, 2)  # Typically 0 or 1
+    q_values = range(0, 4)
+    
+    for p in p_values:
+        for d in d_values:
+            for q in q_values:
+                try:
+                    model = ARIMA(original_data, order=(p, d, q))
+                    results = model.fit()
+                    if results.aic < best_aic:
+                        best_aic = results.aic
+                        best_order = (p, d, q)
+                        best_model = results
+                except:
+                    continue
+    
+    if best_model is None:
+        # Fallback to (1,1,1)
+        best_order = (1, 1, 1)
+        best_model = ARIMA(original_data, order=best_order).fit()
+    
+    return best_model, best_order
 
 def perform_forecast(data_file, forecast_years=5):
     try:
         # Read the CSV file
         df = pd.read_csv(data_file)
         
-        # Ensure the dataframe has 'year' and 'population' columns
+        # Basic validation
         required_columns = ['year', 'population']
         if not all(col in df.columns for col in required_columns):
             return json.dumps({
                 'error': 'CSV file must contain "year" and "population" columns'
             })
-
+    
         # Convert to numeric and handle any non-numeric values
+        df['year'] = pd.to_numeric(df['year'], errors='coerce')
         df['population'] = pd.to_numeric(df['population'], errors='coerce')
         df = df.dropna()
-        df = df.sort_values('year')
+        
+        # Sort and remove duplicates
+        df = df.sort_values('year').drop_duplicates('year')
+        
+        # Validate minimum data points
+        if len(df) < 5:
+            return json.dumps({
+                'error': 'At least 5 years of historical data required for better forecasting'
+            })
+        
+        # Handle gap years
+        min_year = int(df['year'].min())
+        max_year = int(df['year'].max())
+        expected_years = set(range(min_year, max_year + 1))
+        actual_years = set(df['year'].astype(int).values)
+        
+        if len(expected_years - actual_years) > 0:
+            print(f"Detected gaps in years. Interpolating missing data...")
+            df = interpolate_missing_years(df)
         
         # Prepare data for ARIMA
         y = df['population'].values
+        years = df['year'].values
         
-        # Find best ARIMA model with improved parameter selection
-        best_model, order, seasonal_order = find_best_arima_params(y)
+        # Preprocess data to ensure stationarity
+        differenced_data, original_data = preprocess_data(y, years)
         
-        # Generate forecast with confidence intervals
+        # Find best ARIMA model
+        best_model, order = find_best_arima_params(differenced_data, y)
+        
+        # Generate forecast
         forecast = best_model.forecast(steps=forecast_years)
         forecast_ci = best_model.get_forecast(steps=forecast_years).conf_int()
         
-        # Post-process forecasts
-        forecast = np.maximum(forecast, 0)  # Ensure non-negative values
-        forecast_ci = np.maximum(forecast_ci, 0)
+        # Apply constraints to prevent unrealistic forecasts
+        last_value = y[-1]
+        min_growth = -0.02  # Max 2% decline per year
+        max_growth = 0.05   # Max 5% growth per year
         
-        # Apply more sophisticated growth constraints
-        historical_growth_rates = np.diff(y) / y[:-1]
-        growth_std = np.std(historical_growth_rates)
-        max_growth = min(0.15, np.mean(historical_growth_rates) + 2 * growth_std)
-        min_growth = max(-0.1, np.mean(historical_growth_rates) - 2 * growth_std)
+        for i in range(len(forecast)):
+            min_value = last_value * (1 + min_growth)
+            max_value = last_value * (1 + max_growth)
+            forecast[i] = np.clip(forecast[i], min_value, max_value)
+            forecast_ci[i] = np.clip(forecast_ci[i], min_value, max_value)
+            last_value = forecast[i]
         
-        # Smooth extreme forecasts
-        for i in range(1, len(forecast)):
-            growth = (forecast[i] - forecast[i-1]) / forecast[i-1]
-            if growth > max_growth:
-                forecast[i] = forecast[i-1] * (1 + max_growth)
-            elif growth < min_growth:
-                forecast[i] = forecast[i-1] * (1 + min_growth)
+        # Ensure monotonic trend if historical data shows consistent growth
+        if np.all(np.diff(y[-5:]) > 0):  # Check last 5 years for increasing trend
+            for i in range(1, len(forecast)):
+                if forecast[i] < forecast[i-1]:
+                    forecast[i] = forecast[i-1]
+                if forecast_ci[i][0] < forecast_ci[i-1][0]:
+                    forecast_ci[i][0] = forecast_ci[i-1][0]
+                if forecast_ci[i][1] < forecast_ci[i-1][1]:
+                    forecast_ci[i][1] = forecast_ci[i-1][1]
+        
+        # Round values
+        forecast = np.round(forecast).astype(int)
+        forecast_ci = np.round(forecast_ci).astype(int)
+        
+        # Create forecast dataframe
+        future_years = range(int(df['year'].max()) + 1, int(df['year'].max()) + forecast_years + 1)
+        forecast_df = pd.DataFrame({
+            'year': future_years,
+            'population': forecast,
+            'lower_ci': forecast_ci[:, 0],
+            'upper_ci': forecast_ci[:, 1]
+        })
         
         # Calculate metrics
         metrics = calculate_forecast_metrics(y, best_model.fittedvalues)
@@ -194,16 +227,6 @@ def perform_forecast(data_file, forecast_years=5):
         avg_annual_growth = (((forecast[-1] / y[-1]) ** (1/forecast_years)) - 1) * 100
         metrics['total_growth_percent'] = round(total_growth, 2)
         metrics['avg_annual_growth_percent'] = round(avg_annual_growth, 2)
-        
-        # Prepare forecast data with confidence intervals
-        last_year = df['year'].max()
-        future_years = range(last_year + 1, last_year + forecast_years + 1)
-        forecast_df = pd.DataFrame({
-            'year': future_years,
-            'population': forecast.round().astype(int),
-            'lower_ci': forecast_ci[:, 0].round().astype(int),
-            'upper_ci': forecast_ci[:, 1].round().astype(int)
-        })
         
         # Add trend analysis
         metrics['trend'] = 'Increasing' if total_growth > 0 else 'Decreasing' if total_growth < 0 else 'Stable'
