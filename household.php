@@ -2,6 +2,7 @@
 session_start();
 require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'includes/permissions.php';
 
 // Get all households with their members
 $query = "SELECT h.id, h.address, 
@@ -85,9 +86,11 @@ if (isset($_GET['id'])) {
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">Households List</h5>
+                                <?php if (checkUserPermission('create_household')): ?>
                                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addHouseholdModal">
                                     <i class="bi bi-plus"></i> Add Household
                                 </button>
+                                <?php endif; ?>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
@@ -107,20 +110,13 @@ if (isset($_GET['id'])) {
                                                 <td><?php echo htmlspecialchars($row['address']); ?></td>
                                                 <td><?php echo $row['member_count']; ?></td>
                                                 <td>
-                                                    <button type="button" class="btn btn-info btn-sm view-household" data-bs-toggle="modal" 
-                                                            data-bs-target="#viewHouseholdModal" data-id="<?php echo $row['id']; ?>">
-                                                        <i class="fas fa-eye"></i> View
-                                                    </button>
-                                                    <button type="button" class="btn btn-warning btn-sm" 
-                                                            onclick="editHousehold(<?php echo $row['id']; ?>)">
-                                                        <i class="fas fa-edit"></i> Edit
-                                                    </button>
-                                                    <button type="button" class="btn btn-danger btn-sm delete-household" 
-                                                            data-bs-toggle="modal" data-bs-target="#deleteHouseholdModal" 
-                                                            data-id="<?php echo $row['id']; ?>"
-                                                            data-head="<?php echo htmlspecialchars($row['household_head']); ?>">
-                                                        <i class="fas fa-trash"></i> Delete
-                                                    </button>
+                                                    <button type="button" class="btn btn-info btn-sm view-household" data-id="<?php echo $row['id']; ?>">View</button>
+                                                    <?php if (checkUserPermission('edit_household')): ?>
+                                                    <button type="button" class="btn btn-primary btn-sm edit-household" data-id="<?php echo $row['id']; ?>">Edit</button>
+                                                    <?php endif; ?>
+                                                    <?php if (checkUserPermission('delete_household')): ?>
+                                                    <button type="button" class="btn btn-danger btn-sm delete-household" data-id="<?php echo $row['id']; ?>">Delete</button>
+                                                    <?php endif; ?>
                                                 </td>
                                             </tr>
                                             <?php endwhile; ?>

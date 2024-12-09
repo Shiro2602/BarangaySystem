@@ -1,9 +1,12 @@
 <?php
 require_once 'config.php';
 require_once 'auth_check.php';
+require_once 'includes/permissions.php';
 
 // Add Indigency
 if (isset($_POST['add_indigency'])) {
+    checkPermissionAndRedirect('create_indigency');
+    $status = 'Pending'; // Set default status to Pending
     $stmt = $conn->prepare("INSERT INTO indigency (resident_id, purpose, issue_date, or_number, status) 
                           VALUES (?, ?, ?, ?, ?)");
     $stmt->bind_param("issss",
@@ -11,13 +14,14 @@ if (isset($_POST['add_indigency'])) {
         $_POST['purpose'],
         $_POST['issue_date'],
         $_POST['or_number'],
-        $_POST['status']
+        $status
     );
     $stmt->execute();
 }
 
 // Edit Indigency
 if (isset($_POST['edit_indigency'])) {
+    checkPermissionAndRedirect('edit_indigency');
     $stmt = $conn->prepare("UPDATE indigency SET 
         resident_id = ?, 
         purpose = ?, 
@@ -38,9 +42,18 @@ if (isset($_POST['edit_indigency'])) {
 
 // Delete Indigency
 if (isset($_POST['delete_indigency'])) {
+    checkPermissionAndRedirect('delete_indigency');
     $stmt = $conn->prepare("DELETE FROM indigency WHERE id = ?");
     $stmt->bind_param("i", $_POST['indigency_id']);
     $stmt->execute();
+}
+
+// Get all residents for the dropdown
+$residents_query = "SELECT id, first_name, middle_name, last_name FROM residents ORDER BY last_name, first_name";
+$residents_result = $conn->query($residents_query);
+$residents = [];
+while ($row = $residents_result->fetch_assoc()) {
+    $residents[] = $row;
 }
 
 // Get all indigency certificates with resident information
@@ -49,14 +62,10 @@ $query = "SELECT i.*, CONCAT(r.first_name, ' ', r.last_name) as full_name
           LEFT JOIN residents r ON i.resident_id = r.id 
           ORDER BY i.issue_date DESC";
 $result = $conn->query($query);
-$certificates = $result->fetch_all(MYSQLI_ASSOC);
-
-// Get all residents for the dropdown
-$residents_query = "SELECT id, CONCAT(first_name, ' ', last_name) as full_name 
-                   FROM residents 
-                   ORDER BY last_name, first_name";
-$residents_result = $conn->query($residents_query);
-$residents = $residents_result->fetch_all(MYSQLI_ASSOC);
+$certificates = [];
+while ($row = $result->fetch_assoc()) {
+    $certificates[] = $row;
+}
 ?>
 
 <!DOCTYPE html>
@@ -65,7 +74,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indigency Certificates - Barangay Management System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -129,9 +138,11 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 <div class="row mb-4">
                     <div class="col-12">
                         <h2>Indigency Certificates</h2>
+                        <?php if (checkUserPermission('create_indigency')): ?>
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addIndigencyModal">
                             <i class="fas fa-plus"></i> Request Indigency
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -161,15 +172,25 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                     </span>
                                 </td>
                                 <td>
+                                    <button class="btn btn-info btn-sm view-indigency" data-id="<?= $certificate['id']; ?>" 
+                                            data-resident="<?= htmlspecialchars($certificate['full_name']); ?>"
+                                            data-purpose="<?= htmlspecialchars($certificate['purpose']); ?>"
+                                            data-issue-date="<?= htmlspecialchars($certificate['issue_date']); ?>"
+                                            data-or-number="<?= htmlspecialchars($certificate['or_number']); ?>"
+                                            data-status="<?= htmlspecialchars($certificate['status']); ?>"
+                                            data-bs-toggle="modal" data-bs-target="#viewIndigencyModal">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <?php if (checkUserPermission('edit_indigency')): ?>
                                     <button class="btn btn-sm btn-warning edit-indigency" data-id="<?= $certificate['id'] ?>" data-bs-toggle="modal" data-bs-target="#editIndigencyModal" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-success print-indigency" data-id="<?= $certificate['id'] ?>" title="Print">
-                                        <i class="fas fa-print"></i>
-                                    </button>
+                                    <?php endif; ?>
+                                    <?php if (checkUserPermission('delete_indigency')): ?>
                                     <button class="btn btn-sm btn-danger delete-indigency" data-id="<?= $certificate['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteIndigencyModal" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -185,50 +206,38 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Indigency Certificate</h5>
+                    <h5 class="modal-title">Request Indigency Certificate</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label>Resident</label>
-                            <select name="resident_id" class="form-select select2" required>
-                                <option value="">Search for resident...</option>
+                            <label for="resident_id" class="form-label">Resident</label>
+                            <select class="form-select resident-select" name="resident_id" required>
+                                <option value="">Select Resident</option>
                                 <?php foreach ($residents as $resident): ?>
-                                    <option value="<?= htmlspecialchars($resident['id']) ?>">
-                                        <?= htmlspecialchars($resident['full_name']) ?>
+                                    <option value="<?= $resident['id'] ?>">
+                                        <?= htmlspecialchars($resident['first_name'] . ' ' . ($resident['middle_name'] ? $resident['middle_name'] . ' ' : '') . $resident['last_name']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label>Purpose</label>
-                                <input type="text" name="purpose" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label>Issue Date</label>
-                                <input type="date" name="issue_date" class="form-control" required>
-                            </div>
+                        <div class="mb-3">
+                            <label for="purpose" class="form-label">Purpose</label>
+                            <input type="text" class="form-control" name="purpose" required>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label>OR Number</label>
-                                <input type="text" name="or_number" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label>Status</label>
-                                <select name="status" class="form-control" required>
-                                    <option value="Pending">Pending</option>
-                                    <option value="Approved">Approved</option>
-                                    <option value="Rejected">Rejected</option>
-                                </select>
-                            </div>
+                        <div class="mb-3">
+                            <label for="issue_date" class="form-label">Issue Date</label>
+                            <input type="date" class="form-control" name="issue_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="or_number" class="form-label">OR Number</label>
+                            <input type="text" class="form-control" name="or_number" required>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" name="add_indigency" class="btn btn-primary">Add Certificate</button>
+                        <button type="submit" name="add_indigency" class="btn btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -251,7 +260,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                 <label>Resident</label>
                                 <select name="resident_id" id="edit_resident_id" class="form-control" required>
                                     <?php foreach ($residents as $resident): ?>
-                                        <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
+                                        <option value="<?= $resident['id'] ?>"><?= $resident['first_name'] . ' ' . ($resident['middle_name'] ? $resident['middle_name'] . ' ' : '') . $resident['last_name'] ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -310,6 +319,52 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         </div>
     </div>
 
+    <!-- View Indigency Modal -->
+    <div class="modal fade" id="viewIndigencyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">View Indigency Certificate</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Resident Name</label>
+                            <p class="view-resident-name"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Purpose</label>
+                            <p class="view-purpose"></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Issue Date</label>
+                            <p class="view-issue-date"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">OR Number</label>
+                            <p class="view-or-number"></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <p class="view-status"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <?php if (checkUserPermission('print_indigency')): ?>
+                    <button type="button" class="btn btn-primary print-certificate">Print Certificate</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Print Template -->
     <div id="certificateTemplate" class="print-certificate">
         <div class="certificate-header">
@@ -340,76 +395,69 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
-            // Initialize DataTable
-            $('#indigencyTable').DataTable({
-                columnDefs: [
-                    { targets: [1, 2, 3, 4, 5], orderable: false } // Disable sorting for all columns except resident name (index 0)
-                ],
-                order: [[0, 'asc']], // Sort by resident name by default
-                language: {
-                    search: "Search Certificate:"
-                }
-            });
-
-            // Initialize Select2 for all select2 elements
-            $('.select2').each(function() {
-                $(this).select2({
-                    theme: 'bootstrap-5',
-                    width: '100%',
-                    dropdownParent: $(this).closest('.modal'),
-                    placeholder: 'Search for resident...'
-                });
-            });
-
-            // Reset form when modal is hidden
-            $('.modal').on('hidden.bs.modal', function() {
-                $(this).find('form').trigger('reset');
-                $(this).find('.select2').val('').trigger('change');
-            });
-
-            $('.edit-indigency').click(function() {
+            // View Indigency
+            $('.view-indigency').click(function() {
                 var id = $(this).data('id');
-                var certificate = <?php echo json_encode($certificates); ?>.find(c => c.id == id);
-                
-                if (certificate) {
-                    $('#edit_indigency_id').val(certificate.id);
-                    $('#edit_resident_id').val(certificate.resident_id);
-                    $('#edit_purpose').val(certificate.purpose);
-                    $('#edit_issue_date').val(certificate.issue_date);
-                    $('#edit_or_number').val(certificate.or_number);
-                    $('#edit_status').val(certificate.status);
-                }
+                var resident = $(this).data('resident');
+                var purpose = $(this).data('purpose');
+                var issueDate = $(this).data('issue-date');
+                var orNumber = $(this).data('or-number');
+                var status = $(this).data('status');
+
+                // Populate the view modal
+                $('#viewIndigencyModal .view-resident-name').text(resident);
+                $('#viewIndigencyModal .view-purpose').text(purpose);
+                $('#viewIndigencyModal .view-issue-date').text(issueDate);
+                $('#viewIndigencyModal .view-or-number').text(orNumber);
+                $('#viewIndigencyModal .view-status').text(status);
             });
 
+            // Print certificate from view modal
+            $('#viewIndigencyModal .print-certificate').click(function() {
+                var resident = $('#viewIndigencyModal .view-resident-name').text();
+                var purpose = $('#viewIndigencyModal .view-purpose').text();
+                var issueDate = $('#viewIndigencyModal .view-issue-date').text();
+                var orNumber = $('#viewIndigencyModal .view-or-number').text();
+
+                // Clone the certificate template
+                var certificateContent = $('#certificateTemplate').clone();
+                
+                // Update the certificate content
+                certificateContent.find('.resident-name').text(resident);
+                certificateContent.find('.purpose').text(purpose);
+                certificateContent.find('.issue-date').text(issueDate);
+                certificateContent.find('.or-number').text(orNumber);
+
+                // Create a new window for printing
+                var printWindow = window.open('', '_blank');
+                printWindow.document.write('<html><head><title>Indigency Certificate</title>');
+                printWindow.document.write('<link rel="stylesheet" href="css/certificate.css">');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(certificateContent.html());
+                printWindow.document.write('</body></html>');
+                
+                // Wait for CSS to load then print
+                setTimeout(function() {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
+            });
+
+            // Delete confirmation
             $('.delete-indigency').click(function() {
                 var id = $(this).data('id');
                 $('#delete_indigency_id').val(id);
             });
 
-            $('.print-indigency').click(function() {
-                var row = $(this).closest('tr');
-                
-                // Get the data from the row
-                var residentName = row.find('td:eq(0)').text().trim();
-                var purpose = row.find('td:eq(1)').text().trim();
-                var issueDate = new Date(row.find('td:eq(2)').text().trim()).toLocaleDateString();
-                var orNumber = row.find('td:eq(3)').text().trim();
-
-                // Update the certificate template
-                $('#print-resident-name').text(residentName);
-                $('#print-purpose').text(purpose);
-                $('#print-issue-date').text(issueDate);
-                $('#print-or-number').text(orNumber);
-
-                // Print
-                window.print();
+            // Initialize select2 for resident selection
+            $('.resident-select').select2({
+                theme: 'bootstrap4',
+                placeholder: 'Select a resident',
+                width: '100%'
             });
         });
     </script>

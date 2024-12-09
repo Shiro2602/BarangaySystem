@@ -1,9 +1,11 @@
 <?php
 require_once 'config.php';
 require_once 'auth_check.php';
+require_once 'includes/permissions.php';
 
 // Add Clearance
 if (isset($_POST['add_clearance'])) {
+    checkPermissionAndRedirect('create_clearance');
     $stmt = $conn->prepare("INSERT INTO clearances (resident_id, purpose, issue_date, expiry_date, or_number, amount, status) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("issssds",
@@ -20,6 +22,7 @@ if (isset($_POST['add_clearance'])) {
 
 // Edit Clearance
 if (isset($_POST['edit_clearance'])) {
+    checkPermissionAndRedirect('edit_clearance');
     $stmt = $conn->prepare("UPDATE clearances SET 
         resident_id = ?, 
         purpose = ?, 
@@ -44,6 +47,7 @@ if (isset($_POST['edit_clearance'])) {
 
 // Delete Clearance
 if (isset($_POST['delete_clearance'])) {
+    checkPermissionAndRedirect('delete_clearance');
     $stmt = $conn->prepare("DELETE FROM clearances WHERE id = ?");
     $stmt->bind_param("i", $_POST['clearance_id']);
     $stmt->execute();
@@ -151,9 +155,11 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 <div class="row mb-4">
                     <div class="col-12">
                         <h2>Barangay Clearance Management</h2>
+                        <?php if (checkUserPermission('create_clearance')): ?>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestClearanceModal">
                             <i class="fas fa-plus"></i> Request Clearance
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -188,17 +194,27 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                     </span>
                                 </td>
                                 <td>
-                                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                                    <button type="button" class="btn btn-info btn-sm view-clearance" 
+                                            data-id="<?= $clearance['id'] ?>" 
+                                            data-resident="<?= htmlspecialchars($clearance['resident_name']) ?>" 
+                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>" 
+                                            data-issue-date="<?= $clearance['issue_date'] ?>" 
+                                            data-expiry-date="<?= $clearance['expiry_date'] ?>" 
+                                            data-or-number="<?= htmlspecialchars($clearance['or_number']) ?>" 
+                                            data-amount="<?= number_format($clearance['amount'], 2) ?>" 
+                                            data-status="<?= htmlspecialchars($clearance['status']) ?>" 
+                                            data-bs-toggle="modal" data-bs-target="#viewClearanceModal">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <?php if (checkUserPermission('edit_clearance')): ?>
                                     <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-success print-clearance" data-id="<?= $clearance['id'] ?>" title="Print">
-                                        <i class="fas fa-print"></i>
-                                    </button>
+                                    <?php endif; ?>
+                                    <?php if (checkUserPermission('delete_clearance')): ?>
                                     <button class="btn btn-sm btn-danger delete-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteClearanceModal" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
-                                    <?php else: ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -273,38 +289,46 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 <div class="modal-body">
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label>Resident</label>
-                            <input type="text" id="view_resident_name" class="form-control" readonly>
+                            <label class="form-label">Resident Name</label>
+                            <p class="view-resident-name"></p>
                         </div>
                         <div class="col-md-6">
-                            <label>Purpose</label>
-                            <input type="text" id="view_purpose" class="form-control" readonly>
+                            <label class="form-label">Purpose</label>
+                            <p class="view-purpose"></p>
                         </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label>Issue Date</label>
-                            <input type="date" id="view_issue_date" class="form-control" readonly>
+                            <label class="form-label">Issue Date</label>
+                            <p class="view-issue-date"></p>
                         </div>
                         <div class="col-md-6">
-                            <label>Expiry Date</label>
-                            <input type="date" id="view_expiry_date" class="form-control" readonly>
+                            <label class="form-label">Expiry Date</label>
+                            <p class="view-expiry-date"></p>
                         </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label>OR Number</label>
-                            <input type="text" id="view_or_number" class="form-control" readonly>
+                            <label class="form-label">OR Number</label>
+                            <p class="view-or-number"></p>
                         </div>
                         <div class="col-md-6">
-                            <label>Amount</label>
-                            <input type="number" id="view_amount" class="form-control" readonly>
+                            <label class="form-label">Amount</label>
+                            <p class="view-amount"></p>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label>Status</label>
-                        <input type="text" id="view_status" class="form-control" readonly>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <p class="view-status"></p>
+                        </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <?php if (checkUserPermission('print_clearance')): ?>
+                    <button type="button" class="btn btn-primary print-certificate">Print Certificate</button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -468,66 +492,71 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
             // View Clearance
             $('.view-clearance').click(function() {
                 var id = $(this).data('id');
-                var row = $(this).closest('tr');
-                var clearance = <?php echo json_encode($clearances); ?>.find(c => c.id == id);
-                
-                if (clearance) {
-                    $('#view_resident_name').val(clearance.resident_name);
-                    $('#view_purpose').val(clearance.purpose);
-                    $('#view_issue_date').val(clearance.issue_date);
-                    $('#view_expiry_date').val(clearance.expiry_date);
-                    $('#view_or_number').val(clearance.or_number);
-                    $('#view_amount').val(clearance.amount);
-                    $('#view_status').val(clearance.status);
-                }
+                var resident = $(this).data('resident');
+                var purpose = $(this).data('purpose');
+                var issueDate = $(this).data('issue-date');
+                var expiryDate = $(this).data('expiry-date');
+                var orNumber = $(this).data('or-number');
+                var amount = $(this).data('amount');
+                var status = $(this).data('status');
+
+                // Populate the view modal
+                $('#viewClearanceModal .view-resident-name').text(resident);
+                $('#viewClearanceModal .view-purpose').text(purpose);
+                $('#viewClearanceModal .view-issue-date').text(issueDate);
+                $('#viewClearanceModal .view-expiry-date').text(expiryDate);
+                $('#viewClearanceModal .view-or-number').text(orNumber);
+                $('#viewClearanceModal .view-amount').text(amount);
+                $('#viewClearanceModal .view-status').text(status);
             });
 
-            <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
-            // Admin-only event handlers
-            $('.edit-clearance').click(function() {
-                var id = $(this).data('id');
-                var row = $(this).closest('tr');
-                var clearance = <?php echo json_encode($clearances); ?>.find(c => c.id == id);
+            // Print certificate from view modal
+            $('#viewClearanceModal .print-certificate').click(function() {
+                var resident = $('#viewClearanceModal .view-resident-name').text();
+                var purpose = $('#viewClearanceModal .view-purpose').text();
+                var issueDate = $('#viewClearanceModal .view-issue-date').text();
+                var expiryDate = $('#viewClearanceModal .view-expiry-date').text();
+                var orNumber = $('#viewClearanceModal .view-or-number').text();
+                var amount = $('#viewClearanceModal .view-amount').text();
+
+                // Clone the certificate template
+                var certificateContent = $('#certificateTemplate').clone();
                 
-                if (clearance) {
-                    $('#edit_clearance_id').val(clearance.id);
-                    $('#edit_resident_id').val(clearance.resident_id);
-                    $('#edit_purpose').val(clearance.purpose);
-                    $('#edit_issue_date').val(clearance.issue_date);
-                    $('#edit_expiry_date').val(clearance.expiry_date);
-                    $('#edit_or_number').val(clearance.or_number);
-                    $('#edit_amount').val(clearance.amount);
-                    $('#edit_status').val(clearance.status);
-                }
+                // Update the certificate content
+                certificateContent.find('.resident-name').text(resident);
+                certificateContent.find('.purpose').text(purpose);
+                certificateContent.find('.issue-date').text(issueDate);
+                certificateContent.find('.expiry-date').text(expiryDate);
+                certificateContent.find('.or-number').text(orNumber);
+                certificateContent.find('.amount').text(amount);
+
+                // Create a new window for printing
+                var printWindow = window.open('', '_blank');
+                printWindow.document.write('<html><head><title>Clearance Certificate</title>');
+                printWindow.document.write('<link rel="stylesheet" href="css/certificate.css">');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(certificateContent.html());
+                printWindow.document.write('</body></html>');
+                
+                // Wait for CSS to load then print
+                setTimeout(function() {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
             });
 
+            // Delete confirmation
             $('.delete-clearance').click(function() {
                 var id = $(this).data('id');
                 $('#delete_clearance_id').val(id);
             });
 
-            // Print function - admin only
-            $('.print-clearance').click(function() {
-                var row = $(this).closest('tr');
-                
-                // Get the data from the row
-                var residentName = row.find('td:eq(0)').text().trim();
-                var purpose = row.find('td:eq(1)').text().trim();
-                var issueDate = new Date(row.find('td:eq(2)').text().trim()).toLocaleDateString();
-                var orNumber = row.find('td:eq(4)').text().trim();
-                var amount = row.find('td:eq(5)').text().trim();
-
-                // Update the certificate template
-                $('#print-resident-name').text(residentName);
-                $('#print-purpose').text(purpose);
-                $('#print-issue-date').text(issueDate);
-                $('#print-or-number').text(orNumber);
-                $('#print-amount').text(amount);
-
-                // Print
-                window.print();
+            // Initialize select2 for resident selection
+            $('.resident-select').select2({
+                theme: 'bootstrap4',
+                placeholder: 'Select a resident',
+                width: '100%'
             });
-            <?php endif; ?>
         });
     </script>
 </body>

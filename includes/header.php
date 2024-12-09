@@ -18,7 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
     <div class="sidebar">
         <h3 class="text-center">Barangay System</h3>
         <nav>
-            <a href="index.php" <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'class="active"' : ''; ?>>
+            <a href="dashboard.php" <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'class="active"' : ''; ?>>
                 <i class="fas fa-home"></i> Dashboard
             </a>
             <a href="residents.php" <?php echo basename($_SERVER['PHP_SELF']) == 'residents.php' ? 'class="active"' : ''; ?>>

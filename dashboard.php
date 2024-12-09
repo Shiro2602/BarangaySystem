@@ -10,8 +10,6 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
 // Get statistics for dashboard cards
 $stats = [
     'residents' => $conn->query("SELECT COUNT(*) FROM residents")->fetch_row()[0],
-    'clearances' => $conn->query("SELECT COUNT(*) FROM clearances WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
-    'indigency' => $conn->query("SELECT COUNT(*) FROM indigency WHERE MONTH(issue_date) = MONTH(CURRENT_DATE())")->fetch_row()[0],
     'blotters' => $conn->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetch_row()[0]
 ];
 ?>
@@ -127,32 +125,6 @@ $stats = [
                                         <h2 class="mb-0 mt-2"><?= number_format($stats['residents']) ?></h2>
                                     </div>
                                     <i class="fas fa-users fa-2x opacity-75"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Clearances Card -->
-                        <div class="card mb-3 stat-card">
-                            <div class="card-body bg-success text-white rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="card-title mb-0">Clearances Issued</h6>
-                                        <h2 class="mb-0 mt-2"><?= number_format($stats['clearances']) ?></h2>
-                                    </div>
-                                    <i class="fas fa-file-alt fa-2x opacity-75"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Indigency Card -->
-                        <div class="card mb-3 stat-card">
-                            <div class="card-body bg-warning text-white rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="card-title mb-0">Indigency Certificates</h6>
-                                        <h2 class="mb-0 mt-2"><?= number_format($stats['indigency']) ?></h2>
-                                    </div>
-                                    <i class="fas fa-certificate fa-2x opacity-75"></i>
                                 </div>
                             </div>
                         </div>

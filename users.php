@@ -4,7 +4,7 @@ include 'auth_check.php';
 
 // Check if user has admin role
 if ($_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -20,7 +20,6 @@ if (isset($_POST['delete_user']) && isset($_POST['user_id'])) {
 $query = "SELECT id, username, role, first_name, last_name, email, created_at FROM users";
 $result = $conn->query($query);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,6 @@ $result = $conn->query($query);
     <div class="container-fluid">
         <div class="row">
             <?php include 'includes/header.php'; ?>
-
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
                 <!-- Header with user info -->

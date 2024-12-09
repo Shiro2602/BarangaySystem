@@ -6,7 +6,7 @@ require_once 'config.php';
 
 // If already logged in, redirect to index
 if (isset($_SESSION['authenticated']) && $_SESSION['authenticated']) {
-    header("Location: index.php");
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -30,7 +30,7 @@ if (isset($_POST['login'])) {
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['authenticated'] = true;
-            header("Location: index.php");
+            header("Location: dashboard.php");
             exit();
         } else {
             $error_message = "Invalid username or password!";
@@ -40,7 +40,6 @@ if (isset($_POST['login'])) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -69,7 +68,7 @@ if (isset($_POST['login'])) {
             <?php if ($success_message): ?>
                 <div class="alert alert-success"><?php echo $success_message; ?></div>
             <?php endif; ?>
-
+            
             <!-- Login Form -->
             <form method="POST" class="mb-4">
                 <h3 class="text-center mb-4">Login</h3>

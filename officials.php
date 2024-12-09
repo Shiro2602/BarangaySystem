@@ -5,7 +5,7 @@ require_once 'config.php';
 // Check if user has admin role (case-insensitive)
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'admin') {
     $_SESSION['error'] = "Access denied. This page is only accessible to administrators.";
-    header("Location: index.php");
+    header("Location: dashboard.php");
     exit();
 }
 

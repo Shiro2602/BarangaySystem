@@ -4,7 +4,7 @@ include 'config.php';
 
 // Check if user has admin role
 if ($_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
+    header("Location: dashboard.php");
     exit();
 }
 

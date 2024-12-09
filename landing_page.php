@@ -223,6 +223,14 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
+        .navbar-logo {
+            height: 40px;
+            width: 40px;
+            margin-right: 10px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
         .navbar-brand {
             font-family: 'Poppins', sans-serif;
             font-size: 1.6rem;
@@ -303,7 +311,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="#">
-                <i class="fas fa-building me-2"></i>
+                <img src="image/logo.png" alt="Barangay Logo" class="navbar-logo me-2">
                 Barangay Labac
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -331,7 +339,7 @@
 
     <div class="content-section">
         <div class="location-info" data-aos="fade-up">
-            <p><strong>Description:</strong> Labac is a coastal barangay located in Naic, Cavite. It is known for its rich marine biodiversity, including its role as a nesting site for sea turtles (pawikan). The area is also home to the Far East Maritime Foundation, a premier maritime training institution that provides comprehensive programs for aspiring seafarers. Additionally, Labac features pool resort that attract tourists, offering a blend of natural beauty and recreational facilities.</p>
+            <p><strong>Description:</strong> Labac is a coastal barangay located in Naic, Cavite. It is known for its nesting site for sea turtles (pawikan). The area is also home to the Far East Maritime Foundation, a premier maritime training institution that provides comprehensive programs for aspiring seafarers. Additionally, Labac features a pool resort that attract tourists, offering a blend of natural beauty and recreational facilities.</p>
         </div>
 
         <div class="about-section">
@@ -392,7 +400,7 @@
         <div class="attractions-section">
             <div class="text-content" data-aos="fade-right">
                 <h1 style="color: #2C3E50; margin-bottom: 30px;">Local Attractions</h1>
-                <p>Labac is not only a haven for sea turtles but also a tourist destination with a variety of pool resorts that cater to families and visitors. These resorts offer relaxing amenities, scenic views, and a chance to experience the community's charm.</p>
+                <p>Labac is not only a haven for sea turtles but also features Roberto's Pool Resort, a tourist destination that caters to families and visitors. The resort offers relaxing amenities, event catering services, and a chance to experience the community's charm.</p>
                 <p>Tourists can enjoy:</p>
                 <ul>
                     <li>Swimming pools for all ages</li>

@@ -2,6 +2,7 @@
 session_start();
 require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'includes/permissions.php';
 
 // Handle GET requests
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -44,8 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
-    if (isset($_POST['action'])) {
-        if ($_POST['action'] === 'delete') {
+    $action = $_POST['action'] ?? '';
+
+    switch ($action) {
+        case 'delete':
+            checkPermissionAndRedirect('delete_household');
             try {
                 if (!isset($_POST['id']) || empty($_POST['id'])) {
                     throw new Exception('Household ID is required');
@@ -94,7 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit();
-        } elseif ($_POST['action'] === 'edit') {
+        case 'edit':
+            checkPermissionAndRedirect('edit_household');
             $household_id = mysqli_real_escape_string($conn, $_POST['id']);
             $household_head_id = mysqli_real_escape_string($conn, $_POST['household_head']);
             $address = mysqli_real_escape_string($conn, $_POST['address']);
@@ -122,83 +127,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
                 exit();
             }
-        }
-    } elseif (isset($_POST['household_head']) && isset($_POST['address'])) {
-        // Handle adding new household
-        $response = array();
-        
-        try {
-            if (empty($_POST['household_head'])) {
-                throw new Exception('Household head is required');
-            }
-            
-            if (empty($_POST['address'])) {
-                throw new Exception('Address is required');
-            }
-
-            $household_head_id = mysqli_real_escape_string($conn, $_POST['household_head']);
-            $address = mysqli_real_escape_string($conn, $_POST['address']);
-
-            mysqli_begin_transaction($conn);
-
-            // Check if household head is already assigned
-            $check_head = "SELECT household_id FROM residents WHERE id = ?";
-            $stmt = mysqli_prepare($conn, $check_head);
-            mysqli_stmt_bind_param($stmt, "i", $household_head_id);
-            mysqli_stmt_execute($stmt);
-            $result = mysqli_stmt_get_result($stmt);
-            $resident = mysqli_fetch_assoc($result);
-
-            if ($resident && !is_null($resident['household_id'])) {
-                throw new Exception('Selected resident is already part of a household');
-            }
-
-            // Create new household
-            $query = "INSERT INTO households (household_head_id, address) VALUES (?, ?)";
-            $stmt = mysqli_prepare($conn, $query);
-            mysqli_stmt_bind_param($stmt, "is", $household_head_id, $address);
-            
-            if (!mysqli_stmt_execute($stmt)) {
-                throw new Exception('Error creating household: ' . mysqli_error($conn));
-            }
-            
-            $household_id = mysqli_insert_id($conn);
-
-            // Update the household head's household_id
-            $update_query = "UPDATE residents SET household_id = ? WHERE id = ?";
-            $stmt = mysqli_prepare($conn, $update_query);
-            mysqli_stmt_bind_param($stmt, "ii", $household_id, $household_head_id);
-            
-            if (!mysqli_stmt_execute($stmt)) {
-                throw new Exception('Error updating household head: ' . mysqli_error($conn));
-            }
-
-            // Update household members if any are selected
-            if (isset($_POST['household_members']) && is_array($_POST['household_members'])) {
-                $update_members = "UPDATE residents SET household_id = ? WHERE id = ? AND id != ?";
-                $stmt = mysqli_prepare($conn, $update_members);
+        default:
+            if (isset($_POST['household_head']) && isset($_POST['address'])) {
+                checkPermissionAndRedirect('create_household');
+                // Handle adding new household
+                $response = array();
                 
-                foreach ($_POST['household_members'] as $member_id) {
-                    if ($member_id != $household_head_id) {
-                        $member_id = mysqli_real_escape_string($conn, $member_id);
-                        mysqli_stmt_bind_param($stmt, "iii", $household_id, $member_id, $household_head_id);
+                try {
+                    if (empty($_POST['household_head'])) {
+                        throw new Exception('Household head is required');
+                    }
+                    
+                    if (empty($_POST['address'])) {
+                        throw new Exception('Address is required');
+                    }
+
+                    $household_head_id = mysqli_real_escape_string($conn, $_POST['household_head']);
+                    $address = mysqli_real_escape_string($conn, $_POST['address']);
+
+                    mysqli_begin_transaction($conn);
+
+                    // Check if household head is already assigned
+                    $check_head = "SELECT household_id FROM residents WHERE id = ?";
+                    $stmt = mysqli_prepare($conn, $check_head);
+                    mysqli_stmt_bind_param($stmt, "i", $household_head_id);
+                    mysqli_stmt_execute($stmt);
+                    $result = mysqli_stmt_get_result($stmt);
+                    $resident = mysqli_fetch_assoc($result);
+
+                    if ($resident && !is_null($resident['household_id'])) {
+                        throw new Exception('Selected resident is already part of a household');
+                    }
+
+                    // Create new household
+                    $query = "INSERT INTO households (household_head_id, address) VALUES (?, ?)";
+                    $stmt = mysqli_prepare($conn, $query);
+                    mysqli_stmt_bind_param($stmt, "is", $household_head_id, $address);
+                    
+                    if (!mysqli_stmt_execute($stmt)) {
+                        throw new Exception('Error creating household: ' . mysqli_error($conn));
+                    }
+                    
+                    $household_id = mysqli_insert_id($conn);
+
+                    // Update the household head's household_id
+                    $update_query = "UPDATE residents SET household_id = ? WHERE id = ?";
+                    $stmt = mysqli_prepare($conn, $update_query);
+                    mysqli_stmt_bind_param($stmt, "ii", $household_id, $household_head_id);
+                    
+                    if (!mysqli_stmt_execute($stmt)) {
+                        throw new Exception('Error updating household head: ' . mysqli_error($conn));
+                    }
+
+                    // Update household members if any are selected
+                    if (isset($_POST['household_members']) && is_array($_POST['household_members'])) {
+                        $update_members = "UPDATE residents SET household_id = ? WHERE id = ? AND id != ?";
+                        $stmt = mysqli_prepare($conn, $update_members);
                         
-                        if (!mysqli_stmt_execute($stmt)) {
-                            throw new Exception('Error updating household member: ' . mysqli_error($conn));
+                        foreach ($_POST['household_members'] as $member_id) {
+                            if ($member_id != $household_head_id) {
+                                $member_id = mysqli_real_escape_string($conn, $member_id);
+                                mysqli_stmt_bind_param($stmt, "iii", $household_id, $member_id, $household_head_id);
+                                
+                                if (!mysqli_stmt_execute($stmt)) {
+                                    throw new Exception('Error updating household member: ' . mysqli_error($conn));
+                                }
+                            }
                         }
                     }
-                }
-            }
 
-            mysqli_commit($conn);
-            echo json_encode(['success' => true, 'message' => 'Household created successfully']);
-            
-        } catch (Exception $e) {
-            if (isset($conn) && mysqli_ping($conn)) {
-                mysqli_rollback($conn);
+                    mysqli_commit($conn);
+                    echo json_encode(['success' => true, 'message' => 'Household created successfully']);
+                    
+                } catch (Exception $e) {
+                    if (isset($conn) && mysqli_ping($conn)) {
+                        mysqli_rollback($conn);
+                    }
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                }
+                exit();
             }
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
     }
 }
+?>

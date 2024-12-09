@@ -1,9 +1,11 @@
 <?php
 require_once 'config.php';
 require_once 'auth_check.php';
+require_once 'includes/permissions.php';
 
 // Add Resident
 if (isset($_POST['add_resident'])) {
+    checkPermissionAndRedirect('create_resident');
     $stmt = $conn->prepare("INSERT INTO residents (first_name, middle_name, last_name, birthdate, gender, civil_status, address, contact_number, email, occupation) 
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssssssss", 
@@ -23,6 +25,7 @@ if (isset($_POST['add_resident'])) {
 
 // Edit Resident
 if (isset($_POST['edit_resident'])) {
+    checkPermissionAndRedirect('edit_resident');
     $stmt = $conn->prepare("UPDATE residents SET 
         first_name = ?, 
         middle_name = ?, 
@@ -53,6 +56,7 @@ if (isset($_POST['edit_resident'])) {
 
 // Delete Resident
 if (isset($_POST['delete_resident'])) {
+    checkPermissionAndRedirect('delete_resident');
     $stmt = $conn->prepare("DELETE FROM residents WHERE id = ?");
     $stmt->bind_param("i", $_POST['resident_id']);
     $stmt->execute();
@@ -99,9 +103,11 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                 <div class="row mb-4">
                     <div class="col-12">
                         <h2>Residents Management</h2>
+                        <?php if (checkUserPermission('create_resident')): ?>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addResidentModal">
                             <i class="fas fa-plus"></i> Add New Resident
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -130,12 +136,16 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                     <button class="btn btn-sm btn-info view-resident" data-id="<?= $resident['id'] ?>" data-bs-toggle="modal" data-bs-target="#viewResidentModal" title="View">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    <?php if (checkUserPermission('edit_resident')): ?>
                                     <button class="btn btn-sm btn-warning edit-resident" data-id="<?= $resident['id'] ?>" data-bs-toggle="modal" data-bs-target="#editResidentModal" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
+                                    <?php endif; ?>
+                                    <?php if (checkUserPermission('delete_resident')): ?>
                                     <button class="btn btn-sm btn-danger delete-resident" data-id="<?= $resident['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteResidentModal" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
