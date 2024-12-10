@@ -204,7 +204,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                             data-amount="<?= number_format($clearance['amount'], 2) ?>" 
                                             data-status="<?= htmlspecialchars($clearance['status']) ?>" 
                                             data-bs-toggle="modal" data-bs-target="#viewClearanceModal">
-                                        <i class="fas fa-eye"></i> View
+                                        <i class="fas fa-eye"></i> 
                                     </button>
                                     <?php if (checkUserPermission('edit_clearance')): ?>
                                     <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">

@@ -205,14 +205,16 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_API_KEY; ?>&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_API_KEY; ?>&libraries=visualization&callback=initMap" async defer></script>
     <script>
         const incidents = <?php echo json_encode($incidents); ?>;
         const BARANGAY_LAT = <?php echo BARANGAY_LAT; ?>;
         const BARANGAY_LNG = <?php echo BARANGAY_LNG; ?>;
         let map;
         let markers = [];
+        let heatmap;
         let geocoder;
+        let isHeatmapVisible = false;
 
         function initMap() {
             // Center on Labac, Naic, Cavite
@@ -234,6 +236,25 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
                 icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
             });
 
+            // Initialize heatmap
+            const heatmapData = incidents.map(incident => ({
+                location: new google.maps.LatLng(parseFloat(incident.latitude), parseFloat(incident.longitude)),
+                weight: 1
+            }));
+
+            heatmap = new google.maps.visualization.HeatmapLayer({
+                data: heatmapData,
+                radius: 30,
+                opacity: 0.7
+            });
+
+            // Add toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = 'Toggle Heatmap';
+            toggleButton.classList.add('btn', 'btn-primary', 'position-absolute', 'top-0', 'end-0', 'm-2');
+            toggleButton.addEventListener('click', toggleHeatmap);
+            map.controls[google.maps.ControlPosition.TOP_RIGHT].push(toggleButton);
+
             plotIncidents();
 
             // Add filter listeners
@@ -241,6 +262,17 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
             document.getElementById('status').addEventListener('change', filterMarkers);
             document.getElementById('startDate').addEventListener('change', filterMarkers);
             document.getElementById('endDate').addEventListener('change', filterMarkers);
+        }
+
+        function toggleHeatmap() {
+            if (isHeatmapVisible) {
+                heatmap.setMap(null);
+                markers.forEach(marker => marker.setMap(map));
+            } else {
+                heatmap.setMap(map);
+                markers.forEach(marker => marker.setMap(null));
+            }
+            isHeatmapVisible = !isHeatmapVisible;
         }
 
         function plotIncidents() {

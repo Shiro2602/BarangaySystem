@@ -179,7 +179,7 @@ while ($row = $result->fetch_assoc()) {
                                             data-or-number="<?= htmlspecialchars($certificate['or_number']); ?>"
                                             data-status="<?= htmlspecialchars($certificate['status']); ?>"
                                             data-bs-toggle="modal" data-bs-target="#viewIndigencyModal">
-                                        <i class="fas fa-eye"></i> View
+                                        <i class="fas fa-eye"></i> 
                                     </button>
                                     <?php if (checkUserPermission('edit_indigency')): ?>
                                     <button class="btn btn-sm btn-warning edit-indigency" data-id="<?= $certificate['id'] ?>" data-bs-toggle="modal" data-bs-target="#editIndigencyModal" title="Edit">

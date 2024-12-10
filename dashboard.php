@@ -10,7 +10,8 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
 // Get statistics for dashboard cards
 $stats = [
     'residents' => $conn->query("SELECT COUNT(*) FROM residents")->fetch_row()[0],
-    'blotters' => $conn->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetch_row()[0]
+    'blotters' => $conn->query("SELECT COUNT(*) FROM blotter WHERE status = 'Pending'")->fetch_row()[0],
+    'households' => $conn->query("SELECT COUNT(DISTINCT household_id) FROM residents")->fetch_row()[0]
 ];
 ?>
 <!DOCTYPE html>
@@ -124,7 +125,20 @@ $stats = [
                                         <h6 class="card-title mb-0">Total Residents</h6>
                                         <h2 class="mb-0 mt-2"><?= number_format($stats['residents']) ?></h2>
                                     </div>
-                                    <i class="fas fa-users fa-2x opacity-75"></i>
+                                    <i class="fas fa-users fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Households Card -->
+                        <div class="card mb-3 stat-card">
+                            <div class="card-body bg-success text-white rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-0">Total Households</h6>
+                                        <h2 class="mb-0 mt-2"><?= number_format($stats['households']) ?></h2>
+                                    </div>
+                                    <i class="fas fa-home fa-2x"></i>
                                 </div>
                             </div>
                         </div>

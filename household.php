@@ -110,12 +110,18 @@ if (isset($_GET['id'])) {
                                                 <td><?php echo htmlspecialchars($row['address']); ?></td>
                                                 <td><?php echo $row['member_count']; ?></td>
                                                 <td>
-                                                    <button type="button" class="btn btn-info btn-sm view-household" data-id="<?php echo $row['id']; ?>">View</button>
+                                                    <button type="button" class="btn btn-info btn-sm view-household" data-id="<?php echo $row['id']; ?>" title="View">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
                                                     <?php if (checkUserPermission('edit_household')): ?>
-                                                    <button type="button" class="btn btn-primary btn-sm edit-household" data-id="<?php echo $row['id']; ?>">Edit</button>
+                                                    <button type="button" class="btn btn-warning btn-sm edit-household" data-id="<?php echo $row['id']; ?>" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
                                                     <?php endif; ?>
                                                     <?php if (checkUserPermission('delete_household')): ?>
-                                                    <button type="button" class="btn btn-danger btn-sm delete-household" data-id="<?php echo $row['id']; ?>">Delete</button>
+                                                    <button type="button" class="btn btn-danger btn-sm delete-household" data-id="<?php echo $row['id']; ?>" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>

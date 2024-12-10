@@ -13,7 +13,7 @@ if (isset($_POST['add_official'])) {
                           VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssss",
         $_POST['position'],
-        $_POST['first_name'],
+        $_POST['first_name'], 
         $_POST['last_name'],
         $_POST['contact_number'],
         $_POST['term_start'],
@@ -84,12 +84,6 @@ $history_officials = $history_result->fetch_all(MYSQLI_ASSOC);
         .main-content {
             padding: 20px;
         }
-        .official-card {
-            transition: transform 0.2s;
-        }
-        .official-card:hover {
-            transform: translateY(-5px);
-        }
     </style>
 </head>
 <body>
@@ -108,97 +102,112 @@ $history_officials = $history_result->fetch_all(MYSQLI_ASSOC);
                     </div>
                 </div>
 
-                <!-- Officials Cards -->
-                <div class="row">
-                    <?php foreach ($officials as $official): ?>
-                    <div class="col-md-4 mb-4">
-                        <div class="card official-card">
+                <!-- Officials Table -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Current Officials</h5>
+                            </div>
                             <div class="card-body">
-                                <h5 class="card-title"><?= htmlspecialchars($official['position']) ?></h5>
-                                <h6 class="card-subtitle mb-2 text-muted">
-                                    <?= htmlspecialchars($official['first_name'] . ' ' . $official['last_name']) ?>
-                                </h6>
-                                <p class="card-text">
-                                    <small class="text-muted">
-                                        Term: <?= date('M Y', strtotime($official['term_start'])) ?> - 
-                                        <?= date('M Y', strtotime($official['term_end'])) ?>
-                                    </small>
-                                </p>
-                                <p class="card-text">
-                                    <i class="fas fa-phone me-2"></i>
-                                    <?= htmlspecialchars($official['contact_number']) ?>
-                                </p>
-                                <div class="mt-3">
-                                    <?php if (checkUserPermission('edit_official')): ?>
-                                    <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <?php endif; ?>
-                                    <?php if (checkUserPermission('end_official_term')): ?>
-                                    <button class="btn btn-sm btn-danger" title="End Term" data-bs-toggle="modal" data-bs-target="#endTermModal<?= $official['id'] ?>">
-                                        <i class="fas fa-user-times"></i> End Term
-                                    </button>
-                                    <?php endif; ?>
+                                <div class="table-responsive">
+                                    <table id="currentOfficialsTable" class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Position</th>
+                                                <th>Name</th>
+                                                <th>Contact</th>
+                                                <th>Term Start</th>
+                                                <th>Term End</th>
+                                                <th>Status</th>
+                                                <?php if (checkUserPermission('edit_official') || checkUserPermission('end_official_term')): ?>
+                                                    <th>Actions</th>
+                                                <?php endif; ?>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($officials as $official): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($official['position']) ?></td>
+                                                <td><?= htmlspecialchars($official['first_name'] . ' ' . $official['last_name']) ?></td>
+                                                <td><?= htmlspecialchars($official['contact_number']) ?></td>
+                                                <td><?= date('M d, Y', strtotime($official['term_start'])) ?></td>
+                                                <td><?= date('M d, Y', strtotime($official['term_end'])) ?></td>
+                                                <td>
+                                                    <span class="badge bg-<?= $official['status'] == 'Active' ? 'success' : 'secondary' ?>">
+                                                        <?= $official['status'] ?>
+                                                    </span>
+                                                </td>
+                                                <?php if (checkUserPermission('edit_official') || checkUserPermission('end_official_term')): ?>
+                                                <td>
+                                                    <div class="btn-group" role="group">
+                                                        <?php if (checkUserPermission('edit_official')): ?>
+                                                            <button class="btn btn-sm btn-warning" 
+                                                                    title="Edit" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#editOfficialModal<?= $official['id'] ?>">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                        <?php endif; ?>
+                                                        <?php if (checkUserPermission('end_official_term')): ?>
+                                                            <button class="btn btn-sm btn-danger" 
+                                                                    title="End Term" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#endTermModal<?= $official['id'] ?>">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </td>
+                                                <?php endif; ?>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <?php endforeach; ?>
                 </div>
 
-                <!-- Officials Table -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <h3>Officials History</h3>
-                        <div class="table-responsive">
-                            <table id="officialsTable" class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Position</th>
-                                        <th>Name</th>
-                                        <th>Contact</th>
-                                        <th>Term Start</th>
-                                        <th>Term End</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($officials as $official): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($official['position']) ?></td>
-                                        <td><?= htmlspecialchars($official['first_name'] . ' ' . $official['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($official['contact_number']) ?></td>
-                                        <td><?= $official['term_start'] ?></td>
-                                        <td><?= $official['term_end'] ?></td>
-                                        <td>
-                                            <span class="badge bg-<?= $official['status'] == 'Active' ? 'success' : 'secondary' ?>">
-                                                <?= $official['status'] ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php if (checkUserPermission('edit_official')): ?>
-                                            <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <?php endif; ?>
-                                            <?php if (checkUserPermission('end_official_term')): ?>
-                                            <button class="btn btn-sm btn-danger" title="End Term" data-bs-toggle="modal" data-bs-target="#endTermModal<?= $official['id'] ?>">
-                                                <i class="fas fa-times"></i> End Term
-                                            </button>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<!-- Officials History Table -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Officials History</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="historyOfficialsTable" class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Term Start</th>
+                        <th>Term End</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($history_officials as $official): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($official['position']) ?></td>
+                        <td><?= htmlspecialchars($official['first_name'] . ' ' . $official['last_name']) ?></td>
+                        <td><?= htmlspecialchars($official['contact_number']) ?></td>
+                        <td><?= date('M d, Y', strtotime($official['term_start'])) ?></td>
+                        <td><?= date('M d, Y', strtotime($official['term_end'])) ?></td>
+                        <td>
+                            <span class="badge bg-<?= $official['status'] == 'Active' ? 'success' : 'secondary' ?>">
+                                <?= $official['status'] ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
-
+</div>
     <!-- Add Official Modal -->
     <div class="modal fade" id="addOfficialModal" tabindex="-1">
         <div class="modal-dialog">
@@ -342,8 +351,16 @@ $history_officials = $history_result->fetch_all(MYSQLI_ASSOC);
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('#officialsTable').DataTable({
-                order: [[3, 'desc']]
+            // Initialize DataTables for current officials
+            $('#currentOfficialsTable').DataTable({
+                order: [[3, 'desc']],
+                responsive: true
+            });
+
+            // Initialize DataTables for historical officials
+            $('#historyOfficialsTable').DataTable({
+                order: [[3, 'desc']],
+                responsive: true
             });
         });
     </script>
