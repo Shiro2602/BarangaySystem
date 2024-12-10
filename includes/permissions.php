@@ -27,7 +27,16 @@ function checkUserPermission($action) {
             'edit_clearance' => true,
             'delete_clearance' => true,
             'view_clearance' => true,
-            'print_clearance' => true
+            'print_clearance' => true,
+            'view_officials' => true,
+            'create_official' => true,
+            'edit_official' => true,
+            'end_official_term' => true,
+            'create_blotter' => true,
+            'edit_blotter' => true,
+            'delete_blotter' => true,
+            'view_blotter' => true,
+            'change_blotter_status' => true
         ],
         'secretary' => [
             'create_resident' => false,
@@ -47,7 +56,16 @@ function checkUserPermission($action) {
             'edit_clearance' => false,
             'delete_clearance' => false,
             'view_clearance' => true,
-            'print_clearance' => false
+            'print_clearance' => false,
+            'view_officials' => false,
+            'create_official' => false,
+            'edit_official' => false,
+            'end_official_term' => false,
+            'create_blotter' => true,
+            'edit_blotter' => true,
+            'delete_blotter' => false,
+            'view_blotter' => true,
+            'change_blotter_status' => false
         ]
     ];
 

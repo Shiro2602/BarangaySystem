@@ -1,16 +1,14 @@
 <?php
 require_once 'auth_check.php';
 require_once 'config.php';
+require_once 'includes/permissions.php';
 
-// Check if user has admin role (case-insensitive)
-if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'admin') {
-    $_SESSION['error'] = "Access denied. This page is only accessible to administrators.";
-    header("Location: dashboard.php");
-    exit();
-}
+// Check if user has permission to view officials
+checkPermissionAndRedirect('view_officials');
 
 // Handle official submission
 if (isset($_POST['add_official'])) {
+    checkPermissionAndRedirect('create_official');
     $stmt = $conn->prepare("INSERT INTO officials (position, first_name, last_name, contact_number, term_start, term_end) 
                           VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssss",
@@ -26,6 +24,7 @@ if (isset($_POST['add_official'])) {
 
 // Handle editing official
 if (isset($_POST['edit_official'])) {
+    checkPermissionAndRedirect('edit_official');
     $stmt = $conn->prepare("UPDATE officials SET position = ?, first_name = ?, last_name = ?, 
                            contact_number = ?, term_start = ?, term_end = ? WHERE id = ?");
     $stmt->bind_param("ssssssi",
@@ -42,6 +41,7 @@ if (isset($_POST['edit_official'])) {
 
 // Handle ending official's term
 if (isset($_POST['end_term'])) {
+    checkPermissionAndRedirect('end_official_term');
     $stmt = $conn->prepare("UPDATE officials SET status = 'Inactive' WHERE id = ?");
     $stmt->bind_param("i", $_POST['official_id']);
     $stmt->execute();
@@ -51,6 +51,11 @@ if (isset($_POST['end_term'])) {
 $query = "SELECT * FROM officials WHERE status = 'Active' ORDER BY position";
 $result = $conn->query($query);
 $officials = $result->fetch_all(MYSQLI_ASSOC);
+
+// Get inactive officials for history
+$history_query = "SELECT * FROM officials WHERE status = 'Inactive' ORDER BY term_end DESC";
+$history_result = $conn->query($history_query);
+$history_officials = $history_result->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -95,9 +100,11 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
                 <div class="row mb-4">
                     <div class="col-12 d-flex justify-content-between align-items-center">
                         <h2>Barangay Officials</h2>
+                        <?php if (checkUserPermission('create_official')): ?>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOfficialModal">
                             <i class="fas fa-plus"></i> Add Official
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -122,12 +129,16 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
                                     <?= htmlspecialchars($official['contact_number']) ?>
                                 </p>
                                 <div class="mt-3">
+                                    <?php if (checkUserPermission('edit_official')): ?>
                                     <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
+                                    <?php endif; ?>
+                                    <?php if (checkUserPermission('end_official_term')): ?>
                                     <button class="btn btn-sm btn-danger" title="End Term" data-bs-toggle="modal" data-bs-target="#endTermModal<?= $official['id'] ?>">
                                         <i class="fas fa-user-times"></i> End Term
                                     </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -166,12 +177,16 @@ $officials = $result->fetch_all(MYSQLI_ASSOC);
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-info" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
+                                            <?php if (checkUserPermission('edit_official')): ?>
                                             <button class="btn btn-sm btn-warning" title="Edit" data-bs-toggle="modal" data-bs-target="#editOfficialModal<?= $official['id'] ?>">
                                                 <i class="fas fa-edit"></i>
                                             </button>
+                                            <?php endif; ?>
+                                            <?php if (checkUserPermission('end_official_term')): ?>
+                                            <button class="btn btn-sm btn-danger" title="End Term" data-bs-toggle="modal" data-bs-target="#endTermModal<?= $official['id'] ?>">
+                                                <i class="fas fa-times"></i> End Term
+                                            </button>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

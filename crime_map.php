@@ -5,11 +5,12 @@ require_once 'includes/config_maps.php';
 
 // Get all blotter records with location data
 $query = "SELECT b.*, 
-    CONCAT(c.last_name, ', ', c.first_name) as complainant_name,
-    CONCAT(r.last_name, ', ', r.first_name) as respondent_name
+    CONCAT(c.first_name, ' ', c.last_name) as complainant_name,
+    CONCAT(r.first_name, ' ', r.last_name) as complainee_name
     FROM blotter b 
-    JOIN residents c ON b.complainant_id = c.id 
-    JOIN residents r ON b.respondent_id = r.id 
+    LEFT JOIN residents c ON b.complainant_id = c.id 
+    LEFT JOIN residents r ON b.complainee_id = r.id 
+    WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL
     ORDER BY b.incident_date DESC";
 $result = $conn->query($query);
 $incidents = $result->fetch_all(MYSQLI_ASSOC);
@@ -135,7 +136,6 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
     <div class="container-fluid p-0">
         <div class="row g-0">
             <?php require_once 'includes/header.php'; ?>
-
             <div class="col main-content">
                 <div class="page-title">
                     <h2>Crime Map</h2>
@@ -288,7 +288,7 @@ $incidents = $result->fetch_all(MYSQLI_ASSOC);
                 <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(incident.status)}">${incident.status}</span></p>
                 <p><strong>Details:</strong> ${incident.incident_details}</p>
                 <p><strong>Complainant:</strong> ${incident.complainant_name}</p>
-                <p><strong>Respondent:</strong> ${incident.respondent_name}</p>
+                <p><strong>Complainee:</strong> ${incident.complainee_name}</p>
             `;
         }
 

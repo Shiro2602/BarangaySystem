@@ -2,15 +2,20 @@
 require_once 'auth_check.php';
 require_once 'config.php';
 require_once 'includes/config_maps.php';
+require_once 'includes/permissions.php';
+
+// Check if user has permission to view blotter
+checkPermissionAndRedirect('view_blotter');
 
 // Handle blotter record submission
 if (isset($_POST['submit_blotter'])) {
-    $stmt = $conn->prepare("INSERT INTO blotter (complainant_id, respondent_id, incident_type, incident_date, 
+    checkPermissionAndRedirect('create_blotter');
+    $stmt = $conn->prepare("INSERT INTO blotter (complainant_id, complainee_id, incident_type, incident_date, 
                           incident_location, incident_details, latitude, longitude) 
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("iissssdd",
         $_POST['complainant_id'],
-        $_POST['respondent_id'],
+        $_POST['complainee_id'],
         $_POST['incident_type'],
         $_POST['incident_date'],
         $_POST['incident_location'],
@@ -23,6 +28,7 @@ if (isset($_POST['submit_blotter'])) {
 
 // Handle status update
 if (isset($_POST['update_status'])) {
+    checkPermissionAndRedirect('change_blotter_status');
     $stmt = $conn->prepare("UPDATE blotter SET status = ? WHERE id = ?");
     $stmt->bind_param("si", $_POST['status'], $_POST['blotter_id']);
     $stmt->execute();
@@ -33,10 +39,10 @@ if (isset($_POST['update_status'])) {
 // Get all blotter records
 $query = "SELECT b.*, 
                      CONCAT(c.last_name, ', ', c.first_name) as complainant_name,
-                     CONCAT(r.last_name, ', ', r.first_name) as respondent_name
+                     CONCAT(r.last_name, ', ', r.first_name) as complainee_name
                      FROM blotter b 
                      JOIN residents c ON b.complainant_id = c.id 
-                     JOIN residents r ON b.respondent_id = r.id 
+                     JOIN residents r ON b.complainee_id = r.id 
                      ORDER BY b.created_at DESC";
 $result = $conn->query($query);
 $blotters = $result->fetch_all(MYSQLI_ASSOC);
@@ -86,9 +92,11 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                 <div class="row mb-4">
                     <div class="col-12">
                         <h2>Blotter Records Management</h2>
+                        <?php if (checkUserPermission('create_blotter')): ?>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBlotterModal">
                             <i class="fas fa-plus"></i> Add Blotter Record
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -99,7 +107,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <tr>
                                 <th>Case #</th>
                                 <th>Complainant</th>
-                                <th>Respondent</th>
+                                <th>Complainee</th>
                                 <th>Incident Type</th>
                                 <th>Date</th>
                                 <th>Location</th>
@@ -112,26 +120,28 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <tr>
                                 <td><?= $blotter['id'] ?></td>
                                 <td><?= $blotter['complainant_name'] ?></td>
-                                <td><?= $blotter['respondent_name'] ?></td>
+                                <td><?= $blotter['complainee_name'] ?></td>
                                 <td><?= $blotter['incident_type'] ?></td>
                                 <td><?= $blotter['incident_date'] ?></td>
                                 <td><?= $blotter['incident_location'] ?></td>
                                 <td>
-                                    <span class="badge bg-<?= $blotter['status'] == 'Resolved' ? 'success' : 
-                                        ($blotter['status'] == 'Dismissed' ? 'danger' : 
-                                        ($blotter['status'] == 'Ongoing' ? 'primary' : 'warning')) ?>">
+                                    <span class="badge bg-<?= $blotter['status'] == 'Resolved' ? 'success' : ($blotter['status'] == 'Dismissed' ? 'danger' : ($blotter['status'] == 'Ongoing' ? 'primary' : 'warning')) ?>">
                                         <?= $blotter['status'] ?>
                                     </span>
                                 </td>
                                 <td>
+                                    <?php if (checkUserPermission('edit_blotter')): ?>
                                     <button class="btn btn-sm btn-info" title="View Details" data-bs-toggle="modal" 
                                             data-bs-target="#viewBlotterModal<?= $blotter['id'] ?>">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    <?php if (checkUserPermission('change_blotter_status')): ?>
                                     <button class="btn btn-sm btn-warning" title="Update Status" data-bs-toggle="modal" 
                                             data-bs-target="#updateStatusModal<?= $blotter['id'] ?>">
                                         <i class="fas fa-edit"></i>
                                     </button>
+                                    <?php endif; ?>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
 
@@ -151,8 +161,8 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                                         <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['complainant_name']) ?>" readonly>
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Respondent</label>
-                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['respondent_name']) ?>" readonly>
+                                                        <label class="form-label">Complainee</label>
+                                                        <input type="text" class="form-control" value="<?= htmlspecialchars($blotter['complainee_name']) ?>" readonly>
                                                     </div>
                                                     <div class="mb-3">
                                                         <label class="form-label">Incident Type</label>
@@ -219,6 +229,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                     </div>
                                 </div>
                             </div>
+
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -248,9 +259,9 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Respondent</label>
-                                <select class="form-select" name="respondent_id" required>
-                                    <option value="">Select Respondent</option>
+                                <label class="form-label">Complainee</label>
+                                <select class="form-select" name="complainee_id" required>
+                                    <option value="">Select Complainee</option>
                                     <?php foreach ($residents as $resident): ?>
                                         <option value="<?= $resident['id'] ?>"><?= $resident['full_name'] ?></option>
                                     <?php endforeach; ?>
