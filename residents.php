@@ -6,38 +6,14 @@ require_once 'includes/permissions.php';
 // Add Resident
 if (isset($_POST['add_resident'])) {
     checkPermissionAndRedirect('create_resident');
-    $stmt = $conn->prepare("INSERT INTO residents (first_name, middle_name, last_name, birthdate, gender, civil_status, address, contact_number, email, occupation) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssssssss", 
-        $_POST['first_name'],
-        $_POST['middle_name'],
-        $_POST['last_name'],
-        $_POST['birthdate'],
-        $_POST['gender'],
-        $_POST['civil_status'],
-        $_POST['address'],
-        $_POST['contact_number'],
-        $_POST['email'],
-        $_POST['occupation']
-    );
-    $stmt->execute();
-}
-
-// Edit Resident
-if (isset($_POST['edit_resident'])) {
-    checkPermissionAndRedirect('edit_resident');
-    $stmt = $conn->prepare("UPDATE residents SET 
-        first_name = ?, 
-        middle_name = ?, 
-        last_name = ?, 
-        birthdate = ?, 
-        gender = ?, 
-        civil_status = ?, 
-        address = ?, 
-        contact_number = ?, 
-        email = ?, 
-        occupation = ? 
-        WHERE id = ?");
+    
+    // Calculate age
+    $birthDate = new DateTime($_POST['birthdate']);
+    $today = new DateTime();
+    $age = $birthDate->diff($today)->y;
+    
+    $stmt = $conn->prepare("INSERT INTO residents (first_name, middle_name, last_name, birthdate, gender, civil_status, address, contact_number, email, occupation, age) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssssssssi", 
         $_POST['first_name'],
         $_POST['middle_name'],
@@ -49,6 +25,45 @@ if (isset($_POST['edit_resident'])) {
         $_POST['contact_number'],
         $_POST['email'],
         $_POST['occupation'],
+        $age
+    );
+    $stmt->execute();
+}
+
+// Edit Resident
+if (isset($_POST['edit_resident'])) {
+    checkPermissionAndRedirect('edit_resident');
+    
+    // Calculate age
+    $birthDate = new DateTime($_POST['birthdate']);
+    $today = new DateTime();
+    $age = $birthDate->diff($today)->y;
+    
+    $stmt = $conn->prepare("UPDATE residents SET 
+        first_name = ?, 
+        middle_name = ?, 
+        last_name = ?, 
+        birthdate = ?, 
+        gender = ?, 
+        civil_status = ?, 
+        address = ?, 
+        contact_number = ?, 
+        email = ?, 
+        occupation = ?,
+        age = ? 
+        WHERE id = ?");
+    $stmt->bind_param("ssssssssssii", 
+        $_POST['first_name'],
+        $_POST['middle_name'],
+        $_POST['last_name'],
+        $_POST['birthdate'],
+        $_POST['gender'],
+        $_POST['civil_status'],
+        $_POST['address'],
+        $_POST['contact_number'],
+        $_POST['email'],
+        $_POST['occupation'],
+        $age,
         $_POST['resident_id']
     );
     $stmt->execute();
@@ -118,6 +133,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <tr>
                                 <th>Name</th>
                                 <th>Birthdate</th>
+                                <th>Age</th>
                                 <th>Gender</th>
                                 <th>Address</th>
                                 <th>Contact</th>
@@ -129,6 +145,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <tr>
                                 <td><?= $resident['last_name'] . ', ' . $resident['first_name'] . ' ' . $resident['middle_name'] ?></td>
                                 <td><?= $resident['birthdate'] ?></td>
+                                <td><?= $resident['age'] ?></td>
                                 <td><?= $resident['gender'] ?></td>
                                 <td><?= $resident['address'] ?></td>
                                 <td><?= $resident['contact_number'] ?></td>
@@ -260,12 +277,12 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <input type="date" id="view_birthdate" class="form-control" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label>Gender</label>
-                            <input type="text" id="view_gender" class="form-control" readonly>
+                            <label>Age</label>
+                            <input type="text" id="view_age" class="form-control" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label>Civil Status</label>
-                            <input type="text" id="view_civil_status" class="form-control" readonly>
+                            <label>Gender</label>
+                            <input type="text" id="view_gender" class="form-control" readonly>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -322,20 +339,15 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                                 <input type="date" name="birthdate" id="edit_birthdate" class="form-control" required>
                             </div>
                             <div class="col-md-4">
+                                <label>Age</label>
+                                <input type="text" id="edit_age" class="form-control" readonly>
+                            </div>
+                            <div class="col-md-4">
                                 <label>Gender</label>
                                 <select name="gender" id="edit_gender" class="form-control" required>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                     <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label>Civil Status</label>
-                                <select name="civil_status" id="edit_civil_status" class="form-control" required>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Widowed">Widowed</option>
-                                    <option value="Divorced">Divorced</option>
                                 </select>
                             </div>
                         </div>
@@ -413,6 +425,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     $('#view_middle_name').val(resident.middle_name);
                     $('#view_last_name').val(resident.last_name);
                     $('#view_birthdate').val(resident.birthdate);
+                    $('#view_age').val(resident.age);
                     $('#view_gender').val(resident.gender);
                     $('#view_civil_status').val(resident.civil_status);
                     $('#view_address').val(resident.address);
@@ -434,6 +447,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     $('#edit_middle_name').val(resident.middle_name);
                     $('#edit_last_name').val(resident.last_name);
                     $('#edit_birthdate').val(resident.birthdate);
+                    $('#edit_age').val(resident.age);
                     $('#edit_gender').val(resident.gender);
                     $('#edit_civil_status').val(resident.civil_status);
                     $('#edit_address').val(resident.address);
