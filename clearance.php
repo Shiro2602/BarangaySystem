@@ -54,7 +54,12 @@ if (isset($_POST['delete_clearance'])) {
 }
 
 // Get all clearances with resident information
-$query = "SELECT c.*, CONCAT(r.first_name, ' ', r.last_name) as resident_name 
+$query = "SELECT c.*, 
+          CONCAT(r.first_name, ' ', COALESCE(r.middle_name, ''), ' ', r.last_name) as resident_name,
+          r.birthdate,
+          r.civil_status,
+          r.address,
+          TIMESTAMPDIFF(YEAR, r.birthdate, CURDATE()) as age
           FROM clearances c 
           LEFT JOIN residents r ON c.resident_id = r.id 
           ORDER BY c.issue_date DESC";
@@ -214,7 +219,16 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                             data-expiry-date="<?= $clearance['expiry_date'] ?>" 
                                             data-or-number="<?= htmlspecialchars($clearance['or_number']) ?>" 
                                             data-amount="<?= number_format($clearance['amount'], 2) ?>">
-                                        <i class="fas fa-print"></i>
+                                        <i class="fas fa-print"></i> HTML
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-info print-docx"
+                                            data-resident="<?= htmlspecialchars($clearance['resident_name']) ?>" 
+                                            data-age="<?= $clearance['age'] ?>"
+                                            data-civil-status="<?= htmlspecialchars($clearance['civil_status']) ?>"
+                                            data-address="<?= htmlspecialchars($clearance['address']) ?>"
+                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>" 
+                                            data-issue-date="<?= $clearance['issue_date'] ?>">
+                                        <i class="fas fa-file-word"></i> DOCX
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('edit_clearance')): ?>
@@ -574,6 +588,48 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     printWindow.print();
                     printWindow.close();
                 }, 1000);
+            });
+
+            // Print DOCX certificate
+            $('.print-docx').click(function() {
+                var data = {
+                    resident_name: $(this).data('resident'),
+                    age: $(this).data('age'),
+                    civil_status: $(this).data('civil-status'),
+                    address: $(this).data('address'),
+                    purpose: $(this).data('purpose'),
+                    issue_date: $(this).data('issue-date')
+                };
+
+                // Show loading indicator
+                $(this).prop('disabled', true);
+                $(this).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+                
+                var button = $(this);
+
+                // Send AJAX request to generate DOCX
+                $.ajax({
+                    url: 'process_docx.php',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function(response) {
+                        if (response.error) {
+                            alert('Error: ' + response.error);
+                        } else {
+                            // Download the generated file
+                            window.location.href = 'download_clearance.php?file=' + response.file;
+                        }
+                    },
+                    error: function() {
+                        alert('Failed to generate document. Please try again.');
+                    },
+                    complete: function() {
+                        // Reset button state
+                        button.prop('disabled', false);
+                        button.html('<i class="fas fa-file-word"></i> DOCX');
+                    }
+                });
             });
 
             // Delete confirmation

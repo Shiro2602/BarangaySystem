@@ -284,6 +284,10 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                             <label>Gender</label>
                             <input type="text" id="view_gender" class="form-control" readonly>
                         </div>
+                        <div class="col-md-4">
+                            <label>Civil Status</label>
+                            <input type="text" id="view_civil_status" class="form-control" readonly>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label>Address</label>
