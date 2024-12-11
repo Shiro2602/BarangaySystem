@@ -206,6 +206,17 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                             data-bs-toggle="modal" data-bs-target="#viewClearanceModal">
                                         <i class="fas fa-eye"></i> 
                                     </button>
+                                    <?php if (checkUserPermission('print_clearance')): ?>
+                                    <button type="button" class="btn btn-sm btn-success print-clearance"
+                                            data-resident="<?= htmlspecialchars($clearance['resident_name']) ?>" 
+                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>" 
+                                            data-issue-date="<?= $clearance['issue_date'] ?>" 
+                                            data-expiry-date="<?= $clearance['expiry_date'] ?>" 
+                                            data-or-number="<?= htmlspecialchars($clearance['or_number']) ?>" 
+                                            data-amount="<?= number_format($clearance['amount'], 2) ?>">
+                                        <i class="fas fa-print"></i>
+                                    </button>
+                                    <?php endif; ?>
                                     <?php if (checkUserPermission('edit_clearance')): ?>
                                     <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">
                                         <i class="fas fa-edit"></i>
@@ -326,9 +337,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <?php if (checkUserPermission('print_clearance')): ?>
-                    <button type="button" class="btn btn-primary print-certificate">Print Certificate</button>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -510,39 +518,62 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 $('#viewClearanceModal .view-status').text(status);
             });
 
-            // Print certificate from view modal
-            $('#viewClearanceModal .print-certificate').click(function() {
-                var resident = $('#viewClearanceModal .view-resident-name').text();
-                var purpose = $('#viewClearanceModal .view-purpose').text();
-                var issueDate = $('#viewClearanceModal .view-issue-date').text();
-                var expiryDate = $('#viewClearanceModal .view-expiry-date').text();
-                var orNumber = $('#viewClearanceModal .view-or-number').text();
-                var amount = $('#viewClearanceModal .view-amount').text();
-
-                // Clone the certificate template
-                var certificateContent = $('#certificateTemplate').clone();
-                
-                // Update the certificate content
-                certificateContent.find('.resident-name').text(resident);
-                certificateContent.find('.purpose').text(purpose);
-                certificateContent.find('.issue-date').text(issueDate);
-                certificateContent.find('.expiry-date').text(expiryDate);
-                certificateContent.find('.or-number').text(orNumber);
-                certificateContent.find('.amount').text(amount);
+            // Print certificate from actions column
+            $('.print-clearance').click(function() {
+                var resident = $(this).data('resident');
+                var purpose = $(this).data('purpose');
+                var issueDate = $(this).data('issue-date');
+                var orNumber = $(this).data('or-number');
+                var amount = $(this).data('amount');
 
                 // Create a new window for printing
-                var printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>Clearance Certificate</title>');
-                printWindow.document.write('<link rel="stylesheet" href="css/certificate.css">');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write(certificateContent.html());
-                printWindow.document.write('</body></html>');
+                var printWindow = window.open('', '_blank', 'width=1000,height=800');
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Clearance Certificate</title>
+                        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                        <link rel="stylesheet" href="css/print.css">
+                    </head>
+                    <body>
+                        <div class="print-certificate">
+                            <div class="certificate-header">
+                                <h4>Republic of the Philippines</h4>
+                                <h5>Province of Cavite</h5>
+                                <h5>Municipality of Naic</h5>
+                                <h5>Barangay Labac</h5>
+                                <h4 class="mt-4">OFFICE OF THE BARANGAY CHAIRMAN</h4>
+                                <h3 class="mt-4">BARANGAY CLEARANCE</h3>
+                            </div>
+                            
+                            <div class="certificate-body">
+                                <p class="mb-4">TO WHOM IT MAY CONCERN:</p>
+                                
+                                <p>This is to certify that <strong>${resident}</strong>, of legal age, Filipino Citizen is a bonafide resident of this Barangay.</p>
+                                
+                                <p>This certification is being issued upon the request of the above-named person for <strong>${purpose}</strong> purposes.</p>
+                                
+                                <p>Issued this <strong>${issueDate}</strong> at the Barangay Hall of Labac.</p>
+                                
+                                <p class="mb-4">OR No.: <strong>${orNumber}</strong></p>
+                                <p>Amount: ₱<strong>${amount}</strong></p>
+                            </div>
+                            
+                            <div class="certificate-footer">
+                                <div class="signature-line">
+                                    Barangay Chairman
+                                </div>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `);
                 
                 // Wait for CSS to load then print
                 setTimeout(function() {
                     printWindow.print();
                     printWindow.close();
-                }, 500);
+                }, 1000);
             });
 
             // Delete confirmation
