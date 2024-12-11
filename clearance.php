@@ -86,7 +86,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-    <link href="css/print.css" rel="stylesheet">
     <style>
         .sidebar {
             height: 100vh;
@@ -133,22 +132,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
             padding: 6px 12px;
             border: 1px solid #ced4da;
-        }
-        .print-certificate {
-            width: 8.5in;
-            height: 11in;
-            padding: 0.5in;
-            margin: auto;
-            border: 1px solid #ddd;
-            display: none;
-        }
-        @media print {
-            .print-certificate {
-                display: block;
-            }
-            .no-print {
-                display: none;
-            }
         }
     </style>
 </head>
@@ -212,21 +195,12 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                         <i class="fas fa-eye"></i> 
                                     </button>
                                     <?php if (checkUserPermission('print_clearance')): ?>
-                                    <button type="button" class="btn btn-sm btn-success print-clearance"
-                                            data-resident="<?= htmlspecialchars($clearance['resident_name']) ?>" 
-                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>" 
-                                            data-issue-date="<?= $clearance['issue_date'] ?>" 
-                                            data-expiry-date="<?= $clearance['expiry_date'] ?>" 
-                                            data-or-number="<?= htmlspecialchars($clearance['or_number']) ?>" 
-                                            data-amount="<?= number_format($clearance['amount'], 2) ?>">
-                                        <i class="fas fa-print"></i> HTML
-                                    </button>
                                     <button type="button" class="btn btn-sm btn-info print-docx"
                                             data-resident="<?= htmlspecialchars($clearance['resident_name']) ?>" 
                                             data-age="<?= $clearance['age'] ?>"
                                             data-civil-status="<?= htmlspecialchars($clearance['civil_status']) ?>"
                                             data-address="<?= htmlspecialchars($clearance['address']) ?>"
-                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>" 
+                                            data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>"
                                             data-issue-date="<?= $clearance['issue_date'] ?>">
                                         <i class="fas fa-file-word"></i> DOCX
                                     </button>
@@ -443,39 +417,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
         </div>
     </div>
 
-    <!-- Print Template (Hidden) -->
-    <div id="certificateTemplate" class="print-certificate">
-        <div class="certificate-header">
-            <h4>Republic of the Philippines</h4>
-            <h5>Province of Cavite</h5>
-            <h5>Municipality of Naic</h5>
-            <h5>Barangay Labac</h5>
-            <h4 class="mt-4">OFFICE OF THE BARANGAY CHAIRMAN</h4>
-            <h3 class="mt-4">BARANGAY CLEARANCE</h3>
-        </div>
-        
-        <div class="certificate-body">
-            <p class="mb-4">TO WHOM IT MAY CONCERN:</p>
-            
-            <p>This is to certify that <strong><span id="print-resident-name">_______________</span></strong>, of legal age, Filipino Citizen is a bonafide resident of this Barangay.</p>
-            
-            <p>This certification is being issued upon the request of the above-named person for <strong><span id="print-purpose">_______________</span></strong> purposes.</p>
-            
-            <p>Issued this <strong><span id="print-issue-date">_______________</span></strong> at the Barangay Hall of Labac.</p>
-            
-            <p class="mb-4">OR No.: <strong><span id="print-or-number">_______________</span></strong></p>
-            <p>Amount: ₱<strong><span id="print-amount">_______________</span></strong></p>
-        </div>
-        
-        <div class="certificate-footer">
-            <div class="signature-line">
-                Barangay Chairman
-            </div>
-        </div>
-    </div>
-
-    </div>
-
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -487,15 +428,15 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
             // Initialize DataTable
             $('#clearanceTable').DataTable({
                 columnDefs: [
-                    { targets: [1, 2, 3, 4, 5, 6, 7], orderable: false } // Disable sorting for all columns except resident name (index 0)
+                    { targets: [1, 2, 3, 4, 5, 6, 7], orderable: false }
                 ],
-                order: [[0, 'asc']], // Sort by resident name by default
+                order: [[0, 'asc']],
                 language: {
                     search: "Search Clearance:"
                 }
             });
 
-            // Initialize Select2 for all select2 elements
+            // Initialize Select2
             $('.select2').each(function() {
                 $(this).select2({
                     theme: 'bootstrap-5',
@@ -532,64 +473,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                 $('#viewClearanceModal .view-status').text(status);
             });
 
-            // Print certificate from actions column
-            $('.print-clearance').click(function() {
-                var resident = $(this).data('resident');
-                var purpose = $(this).data('purpose');
-                var issueDate = $(this).data('issue-date');
-                var orNumber = $(this).data('or-number');
-                var amount = $(this).data('amount');
-
-                // Create a new window for printing
-                var printWindow = window.open('', '_blank', 'width=1000,height=800');
-                printWindow.document.write(`
-                    <html>
-                    <head>
-                        <title>Clearance Certificate</title>
-                        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-                        <link rel="stylesheet" href="css/print.css">
-                    </head>
-                    <body>
-                        <div class="print-certificate">
-                            <div class="certificate-header">
-                                <h4>Republic of the Philippines</h4>
-                                <h5>Province of Cavite</h5>
-                                <h5>Municipality of Naic</h5>
-                                <h5>Barangay Labac</h5>
-                                <h4 class="mt-4">OFFICE OF THE BARANGAY CHAIRMAN</h4>
-                                <h3 class="mt-4">BARANGAY CLEARANCE</h3>
-                            </div>
-                            
-                            <div class="certificate-body">
-                                <p class="mb-4">TO WHOM IT MAY CONCERN:</p>
-                                
-                                <p>This is to certify that <strong>${resident}</strong>, of legal age, Filipino Citizen is a bonafide resident of this Barangay.</p>
-                                
-                                <p>This certification is being issued upon the request of the above-named person for <strong>${purpose}</strong> purposes.</p>
-                                
-                                <p>Issued this <strong>${issueDate}</strong> at the Barangay Hall of Labac.</p>
-                                
-                                <p class="mb-4">OR No.: <strong>${orNumber}</strong></p>
-                                <p>Amount: ₱<strong>${amount}</strong></p>
-                            </div>
-                            
-                            <div class="certificate-footer">
-                                <div class="signature-line">
-                                    Barangay Chairman
-                                </div>
-                            </div>
-                        </div>
-                    </body>
-                    </html>
-                `);
-                
-                // Wait for CSS to load then print
-                setTimeout(function() {
-                    printWindow.print();
-                    printWindow.close();
-                }, 1000);
-            });
-
             // Print DOCX certificate
             $('.print-docx').click(function() {
                 var data = {
@@ -601,48 +484,31 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                     issue_date: $(this).data('issue-date')
                 };
 
-                // Show loading indicator
-                $(this).prop('disabled', true);
-                $(this).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
-                
-                var button = $(this);
-
-                // Send AJAX request to generate DOCX
+                // Send AJAX request to process_docx.php
                 $.ajax({
                     url: 'process_docx.php',
-                    method: 'POST',
-                    contentType: 'application/json',
+                    type: 'POST',
                     data: JSON.stringify(data),
+                    contentType: 'application/json',
                     success: function(response) {
-                        if (response.error) {
+                        if (response.file) {
+                            window.location.href = 'download_clearance.php?file=' + response.file;
+                        } else if (response.error) {
                             alert('Error: ' + response.error);
                         } else {
-                            // Download the generated file
-                            window.location.href = 'download_clearance.php?file=' + response.file;
+                            alert('Unknown error occurred');
                         }
                     },
-                    error: function() {
-                        alert('Failed to generate document. Please try again.');
-                    },
-                    complete: function() {
-                        // Reset button state
-                        button.prop('disabled', false);
-                        button.html('<i class="fas fa-file-word"></i> DOCX');
+                    error: function(xhr, status, error) {
+                        alert('Error: ' + error);
                     }
                 });
             });
 
-            // Delete confirmation
+            // Delete Clearance
             $('.delete-clearance').click(function() {
                 var id = $(this).data('id');
                 $('#delete_clearance_id').val(id);
-            });
-
-            // Initialize select2 for resident selection
-            $('.resident-select').select2({
-                theme: 'bootstrap4',
-                placeholder: 'Select a resident',
-                width: '100%'
             });
         });
     </script>

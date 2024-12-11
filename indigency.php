@@ -57,7 +57,11 @@ while ($row = $residents_result->fetch_assoc()) {
 }
 
 // Get all indigency certificates with resident information
-$query = "SELECT i.*, CONCAT(r.first_name, ' ', r.last_name) as full_name 
+$query = "SELECT i.*, 
+          CONCAT(r.first_name, ' ', r.last_name) as full_name,
+          r.civil_status,
+          r.address,
+          TIMESTAMPDIFF(YEAR, r.birthdate, CURDATE()) as age
           FROM indigency i 
           LEFT JOIN residents r ON i.resident_id = r.id 
           ORDER BY i.issue_date DESC";
@@ -160,34 +164,45 @@ while ($row = $result->fetch_assoc()) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($certificates as $certificate): ?>
+                            <?php foreach ($certificates as $indigency): ?>
                             <tr>
-                                <td><?= htmlspecialchars($certificate['full_name']) ?></td>
-                                <td><?= htmlspecialchars($certificate['purpose']) ?></td>
-                                <td><?= htmlspecialchars($certificate['issue_date']) ?></td>
-                                <td><?= htmlspecialchars($certificate['or_number']) ?></td>
+                                <td><?= htmlspecialchars($indigency['full_name']) ?></td>
+                                <td><?= htmlspecialchars($indigency['purpose']) ?></td>
+                                <td><?= htmlspecialchars($indigency['issue_date']) ?></td>
+                                <td><?= htmlspecialchars($indigency['or_number']) ?></td>
                                 <td>
-                                    <span class="badge <?= $certificate['status'] === 'Approved' ? 'bg-success' : ($certificate['status'] === 'Rejected' ? 'bg-danger' : 'bg-warning') ?>">
-                                        <?= htmlspecialchars($certificate['status']) ?>
+                                    <span class="badge <?= $indigency['status'] === 'Approved' ? 'bg-success' : ($indigency['status'] === 'Rejected' ? 'bg-danger' : 'bg-warning') ?>">
+                                        <?= htmlspecialchars($indigency['status']) ?>
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-info btn-sm view-indigency" data-id="<?= $certificate['id']; ?>" 
-                                            data-resident="<?= htmlspecialchars($certificate['full_name']); ?>"
-                                            data-purpose="<?= htmlspecialchars($certificate['purpose']); ?>"
-                                            data-issue-date="<?= htmlspecialchars($certificate['issue_date']); ?>"
-                                            data-or-number="<?= htmlspecialchars($certificate['or_number']); ?>"
-                                            data-status="<?= htmlspecialchars($certificate['status']); ?>"
+                                    <button class="btn btn-info btn-sm view-indigency" data-id="<?= $indigency['id'] ?>" 
+                                            data-resident="<?= htmlspecialchars($indigency['full_name']) ?>" 
+                                            data-purpose="<?= htmlspecialchars($indigency['purpose']) ?>" 
+                                            data-issue-date="<?= $indigency['issue_date'] ?>" 
+                                            data-or-number="<?= htmlspecialchars($indigency['or_number']) ?>" 
+                                            data-status="<?= htmlspecialchars($indigency['status']) ?>" 
                                             data-bs-toggle="modal" data-bs-target="#viewIndigencyModal">
-                                        <i class="fas fa-eye"></i> 
+                                        <i class="fas fa-eye"></i>
                                     </button>
+                                    <?php if (checkUserPermission('print_indigency')): ?>
+                                    <button type="button" class="btn btn-sm btn-info print-docx"
+                                            data-resident="<?= htmlspecialchars($indigency['full_name']) ?>" 
+                                            data-age="<?= $indigency['age'] ?>"
+                                            data-civil-status="<?= htmlspecialchars($indigency['civil_status']) ?>"
+                                            data-address="<?= htmlspecialchars($indigency['address']) ?>"
+                                            data-purpose="<?= htmlspecialchars($indigency['purpose']) ?>"
+                                            data-issue-date="<?= $indigency['issue_date'] ?>">
+                                        <i class="fas fa-file-word"></i>
+                                    </button>
+                                    <?php endif; ?>
                                     <?php if (checkUserPermission('edit_indigency')): ?>
-                                    <button class="btn btn-sm btn-warning edit-indigency" data-id="<?= $certificate['id'] ?>" data-bs-toggle="modal" data-bs-target="#editIndigencyModal" title="Edit">
+                                    <button class="btn btn-sm btn-warning edit-indigency" data-id="<?= $indigency['id'] ?>" data-bs-toggle="modal" data-bs-target="#editIndigencyModal" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('delete_indigency')): ?>
-                                    <button class="btn btn-sm btn-danger delete-indigency" data-id="<?= $certificate['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteIndigencyModal" title="Delete">
+                                    <button class="btn btn-sm btn-danger delete-indigency" data-id="<?= $indigency['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteIndigencyModal" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                     <?php endif; ?>
@@ -395,10 +410,24 @@ while ($row = $result->fetch_assoc()) {
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
+            // Initialize DataTable
+            $('#indigencyTable').DataTable({
+                order: [[0, 'asc']]
+            });
+
+            // Initialize Select2
+            $('.resident-select').select2({
+                theme: 'bootstrap-5',
+                width: '100%'
+            });
+
             // View Indigency
             $('.view-indigency').click(function() {
                 var id = $(this).data('id');
@@ -408,7 +437,6 @@ while ($row = $result->fetch_assoc()) {
                 var orNumber = $(this).data('or-number');
                 var status = $(this).data('status');
 
-                // Populate the view modal
                 $('#viewIndigencyModal .view-resident-name').text(resident);
                 $('#viewIndigencyModal .view-purpose').text(purpose);
                 $('#viewIndigencyModal .view-issue-date').text(issueDate);
@@ -416,48 +444,42 @@ while ($row = $result->fetch_assoc()) {
                 $('#viewIndigencyModal .view-status').text(status);
             });
 
-            // Print certificate from view modal
-            $('#viewIndigencyModal .print-certificate').click(function() {
-                var resident = $('#viewIndigencyModal .view-resident-name').text();
-                var purpose = $('#viewIndigencyModal .view-purpose').text();
-                var issueDate = $('#viewIndigencyModal .view-issue-date').text();
-                var orNumber = $('#viewIndigencyModal .view-or-number').text();
+            // Print DOCX certificate
+            $('.print-docx').click(function() {
+                var data = {
+                    resident_name: $(this).data('resident'),
+                    age: $(this).data('age'),
+                    civil_status: $(this).data('civil-status'),
+                    address: $(this).data('address'),
+                    purpose: $(this).data('purpose'),
+                    issue_date: $(this).data('issue-date')
+                };
 
-                // Clone the certificate template
-                var certificateContent = $('#certificateTemplate').clone();
-                
-                // Update the certificate content
-                certificateContent.find('.resident-name').text(resident);
-                certificateContent.find('.purpose').text(purpose);
-                certificateContent.find('.issue-date').text(issueDate);
-                certificateContent.find('.or-number').text(orNumber);
-
-                // Create a new window for printing
-                var printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>Indigency Certificate</title>');
-                printWindow.document.write('<link rel="stylesheet" href="css/certificate.css">');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write(certificateContent.html());
-                printWindow.document.write('</body></html>');
-                
-                // Wait for CSS to load then print
-                setTimeout(function() {
-                    printWindow.print();
-                    printWindow.close();
-                }, 500);
+                // Send AJAX request to process_indigency_docx.php
+                $.ajax({
+                    url: 'process_indigency_docx.php',
+                    type: 'POST',
+                    data: JSON.stringify(data),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        if (response.file) {
+                            window.location.href = 'download_indigency.php?file=' + response.file;
+                        } else if (response.error) {
+                            alert('Error: ' + response.error);
+                        } else {
+                            alert('Unknown error occurred');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error: ' + error);
+                    }
+                });
             });
 
-            // Delete confirmation
-            $('.delete-indigency').click(function() {
-                var id = $(this).data('id');
-                $('#delete_indigency_id').val(id);
-            });
-
-            // Initialize select2 for resident selection
-            $('.resident-select').select2({
-                theme: 'bootstrap4',
-                placeholder: 'Select a resident',
-                width: '100%'
+            // Reset form when modal is hidden
+            $('.modal').on('hidden.bs.modal', function() {
+                $(this).find('form').trigger('reset');
+                $(this).find('.select2').val('').trigger('change');
             });
         });
     </script>
