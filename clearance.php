@@ -202,7 +202,7 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                             data-address="<?= htmlspecialchars($clearance['address']) ?>"
                                             data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>"
                                             data-issue-date="<?= $clearance['issue_date'] ?>">
-                                        <i class="fas fa-file-word"></i> DOCX
+                                        <i class="fas fa-file-word"></i>
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('edit_clearance')): ?>

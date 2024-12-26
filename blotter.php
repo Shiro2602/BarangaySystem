@@ -105,7 +105,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                     <table id="blotterTable" class="table table-striped">
                         <thead>
                             <tr>
-                                <th>Case #</th>
                                 <th>Complainant</th>
                                 <th>Complainee</th>
                                 <th>Incident Type</th>
@@ -118,7 +117,6 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
                         <tbody>
                             <?php foreach ($blotters as $blotter): ?>
                             <tr>
-                                <td><?= $blotter['id'] ?></td>
                                 <td><?= $blotter['complainant_name'] ?></td>
                                 <td><?= $blotter['complainee_name'] ?></td>
                                 <td><?= $blotter['incident_type'] ?></td>
@@ -365,7 +363,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
 
         $(document).ready(function() {
             $('#blotterTable').DataTable({
-                order: [[0, 'desc']]
+                ordering: false  // Disable sorting for all columns
             });
 
             // Initialize map when modal is shown

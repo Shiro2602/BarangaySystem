@@ -419,7 +419,10 @@ while ($row = $result->fetch_assoc()) {
         $(document).ready(function() {
             // Initialize DataTable
             $('#indigencyTable').DataTable({
-                order: [[0, 'asc']]
+                order: [[0, 'asc']],
+                columnDefs: [
+                    { targets: [1, 2, 3, 4, 5], orderable: false }  // Disable sorting for all columns except Resident (index 0)
+                ]
             });
 
             // Initialize Select2

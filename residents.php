@@ -414,7 +414,7 @@ $residents = $result->fetch_all(MYSQLI_ASSOC);
             // Initialize DataTable
             var table = $('#residentsTable').DataTable({
                 columnDefs: [
-                    { targets: [1, 2, 3, 4, 5], orderable: false }, // Disable sorting for all columns except name (index 0)
+                    { targets: [1, 2, 3, 4, 5, 6], orderable: false }, // Added index 6 (actions column) to disable sorting
                 ]
             });
 

@@ -31,7 +31,7 @@ $result = $conn->query("SELECT b.*,
     CONCAT(r.first_name, ' ', r.last_name) as respondent
     FROM blotter b
     JOIN residents c ON b.complainant_id = c.id
-    JOIN residents r ON b.respondent_id = r.id
+    JOIN residents r ON b.complainee_id = r.id
     ORDER BY b.created_at DESC LIMIT 5");
 while ($row = $result->fetch_assoc()) {
     $recentBlotters[] = $row;
