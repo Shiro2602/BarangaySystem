@@ -6,13 +6,19 @@ require_once 'includes/permissions.php';
 // Add Clearance
 if (isset($_POST['add_clearance'])) {
     checkPermissionAndRedirect('create_clearance');
+    
+    // For new clearances, set dates to empty strings instead of NULL
+    // MySQL will convert empty strings to NULL for DATE columns
+    $issue_date = '';
+    $expiry_date = '';
+    
     $stmt = $conn->prepare("INSERT INTO clearances (resident_id, purpose, issue_date, expiry_date, or_number, amount, status) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("issssds",
         $_POST['resident_id'],
         $_POST['purpose'],
-        $_POST['issue_date'],
-        $_POST['expiry_date'],
+        $issue_date,
+        $expiry_date,
         $_POST['or_number'],
         $_POST['amount'],
         $_POST['status']
@@ -23,11 +29,40 @@ if (isset($_POST['add_clearance'])) {
 // Edit Clearance
 if (isset($_POST['edit_clearance'])) {
     checkPermissionAndRedirect('edit_clearance');
+    
+    // Get the current status from the database
+    $stmt = $conn->prepare("SELECT status FROM clearances WHERE id = ?");
+    $stmt->bind_param("i", $_POST['clearance_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $current_status = $result->fetch_assoc()['status'];
+    
+    // Set dates based on status change
+    $issue_date = '';
+    $expiry_date = '';
+    
+    if ($_POST['status'] === 'Approved') {
+        // If status is being changed to Approved
+        if ($current_status !== 'Approved') {
+            $issue_date = date('Y-m-d');
+            $expiry_date = date('Y-m-d', strtotime('+1 year'));
+        } else {
+            // If already approved, keep existing dates
+            $stmt = $conn->prepare("SELECT issue_date, expiry_date FROM clearances WHERE id = ?");
+            $stmt->bind_param("i", $_POST['clearance_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $dates = $result->fetch_assoc();
+            $issue_date = $dates['issue_date'] ?: '';
+            $expiry_date = $dates['expiry_date'] ?: '';
+        }
+    }
+    
     $stmt = $conn->prepare("UPDATE clearances SET 
         resident_id = ?, 
         purpose = ?, 
-        issue_date = ?, 
-        expiry_date = ?, 
+        issue_date = NULLIF(?, ''), 
+        expiry_date = NULLIF(?, ''), 
         or_number = ?, 
         amount = ?, 
         status = ? 
@@ -35,8 +70,8 @@ if (isset($_POST['edit_clearance'])) {
     $stmt->bind_param("issssdsi",
         $_POST['resident_id'],
         $_POST['purpose'],
-        $_POST['issue_date'],
-        $_POST['expiry_date'],
+        $issue_date,
+        $expiry_date,
         $_POST['or_number'],
         $_POST['amount'],
         $_POST['status'],
@@ -171,8 +206,8 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                             <tr data-id="<?= $clearance['id'] ?>">
                                 <td class="resident-name"><?= htmlspecialchars($clearance['resident_name']) ?></td>
                                 <td class="purpose"><?= htmlspecialchars($clearance['purpose']) ?></td>
-                                <td class="issue-date"><?= $clearance['issue_date'] ?></td>
-                                <td><?= $clearance['expiry_date'] ?></td>
+                                <td class="issue-date"><?= $clearance['issue_date'] ? $clearance['issue_date'] : '-' ?></td>
+                                <td><?= $clearance['expiry_date'] ? $clearance['expiry_date'] : '-' ?></td>
                                 <td class="or-number"><?= htmlspecialchars($clearance['or_number']) ?></td>
                                 <td class="amount"><?= number_format($clearance['amount'], 2) ?></td>
                                 <td>
@@ -206,7 +241,15 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('edit_clearance')): ?>
-                                    <button class="btn btn-sm btn-warning edit-clearance" data-id="<?= $clearance['id'] ?>" data-bs-toggle="modal" data-bs-target="#editClearanceModal" title="Edit">
+                                    <button class="btn btn-sm btn-warning edit-clearance" 
+                                        data-id="<?= $clearance['id'] ?>" 
+                                        data-resident-id="<?= $clearance['resident_id'] ?>"
+                                        data-purpose="<?= htmlspecialchars($clearance['purpose']) ?>"
+                                        data-or-number="<?= htmlspecialchars($clearance['or_number']) ?>"
+                                        data-amount="<?= $clearance['amount'] ?>"
+                                        data-status="<?= htmlspecialchars($clearance['status']) ?>"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#editClearanceModal">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <?php endif; ?>
@@ -259,14 +302,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                             <input type="number" name="amount" class="form-control" step="0.01" required>
                         </div>
                         <input type="hidden" name="status" value="Pending">
-                        <div class="mb-3">
-                            <label>Issue Date</label>
-                            <input type="date" name="issue_date" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Expiry Date</label>
-                            <input type="date" name="expiry_date" class="form-control" required>
-                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -355,16 +390,6 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
                             <div class="col-md-6">
                                 <label>Purpose</label>
                                 <input type="text" name="purpose" id="edit_purpose" class="form-control" required>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label>Issue Date</label>
-                                <input type="date" name="issue_date" id="edit_issue_date" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label>Expiry Date</label>
-                                <input type="date" name="expiry_date" id="edit_expiry_date" class="form-control" required>
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -509,6 +534,17 @@ $residents = $residents_result->fetch_all(MYSQLI_ASSOC);
             $('.delete-clearance').click(function() {
                 var id = $(this).data('id');
                 $('#delete_clearance_id').val(id);
+            });
+
+            // Edit Clearance
+            $('.edit-clearance').click(function() {
+                var button = $(this);
+                $('#edit_clearance_id').val(button.data('id'));
+                $('#edit_resident_id').val(button.data('resident-id')).trigger('change');
+                $('#edit_purpose').val(button.data('purpose'));
+                $('#edit_or_number').val(button.data('or-number'));
+                $('#edit_amount').val(button.data('amount'));
+                $('#edit_status').val(button.data('status'));
             });
         });
     </script>

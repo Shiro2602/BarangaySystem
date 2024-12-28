@@ -7,14 +7,18 @@ require_once 'includes/permissions.php';
 if (isset($_POST['add_indigency'])) {
     checkPermissionAndRedirect('create_indigency');
     $status = 'Pending'; // Set default status to Pending
-    $stmt = $conn->prepare("INSERT INTO indigency (resident_id, purpose, issue_date, or_number, status) 
-                          VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("issss",
+    $expiry_date = null; // Initialize expiry_date as null
+    $issue_date = date('Y-m-d'); // Set current date as issue date
+    
+    $stmt = $conn->prepare("INSERT INTO indigency (resident_id, purpose, issue_date, or_number, status, expiry_date) 
+                          VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("isssss",
         $_POST['resident_id'],
         $_POST['purpose'],
-        $_POST['issue_date'],
+        $issue_date,  // Use automatically generated issue date
         $_POST['or_number'],
-        $status
+        $status,
+        $expiry_date
     );
     $stmt->execute();
 }
@@ -22,19 +26,35 @@ if (isset($_POST['add_indigency'])) {
 // Edit Indigency
 if (isset($_POST['edit_indigency'])) {
     checkPermissionAndRedirect('edit_indigency');
+    
+    // Get the original issue date
+    $stmt = $conn->prepare("SELECT issue_date FROM indigency WHERE id = ?");
+    $stmt->bind_param("i", $_POST['indigency_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $issue_date = $row['issue_date'];
+    
+    // Calculate expiry date if status is Approved
+    $expiry_date = null;
+    if ($_POST['status'] === 'Approved') {
+        $issue_date_obj = new DateTime($issue_date);
+        $expiry_date = $issue_date_obj->modify('+6 months')->format('Y-m-d');
+    }
+
     $stmt = $conn->prepare("UPDATE indigency SET 
         resident_id = ?, 
         purpose = ?, 
-        issue_date = ?, 
         or_number = ?, 
-        status = ? 
+        status = ?,
+        expiry_date = ?
         WHERE id = ?");
     $stmt->bind_param("issssi",
         $_POST['resident_id'],
         $_POST['purpose'],
-        $_POST['issue_date'],
         $_POST['or_number'],
         $_POST['status'],
+        $expiry_date,
         $_POST['indigency_id']
     );
     $stmt->execute();
@@ -158,6 +178,7 @@ while ($row = $result->fetch_assoc()) {
                                 <th>Resident</th>
                                 <th>Purpose</th>
                                 <th>Issue Date</th>
+                                <th>Expiry Date</th>
                                 <th>OR Number</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -169,6 +190,7 @@ while ($row = $result->fetch_assoc()) {
                                 <td><?= htmlspecialchars($indigency['full_name']) ?></td>
                                 <td><?= htmlspecialchars($indigency['purpose']) ?></td>
                                 <td><?= htmlspecialchars($indigency['issue_date']) ?></td>
+                                <td><?= $indigency['expiry_date'] ? htmlspecialchars($indigency['expiry_date']) : 'N/A' ?></td>
                                 <td><?= htmlspecialchars($indigency['or_number']) ?></td>
                                 <td>
                                     <span class="badge <?= $indigency['status'] === 'Approved' ? 'bg-success' : ($indigency['status'] === 'Rejected' ? 'bg-danger' : 'bg-warning') ?>">
@@ -197,12 +219,20 @@ while ($row = $result->fetch_assoc()) {
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('edit_indigency')): ?>
-                                    <button class="btn btn-sm btn-warning edit-indigency" data-id="<?= $indigency['id'] ?>" data-bs-toggle="modal" data-bs-target="#editIndigencyModal" title="Edit">
+                                    <button class="btn btn-sm btn-warning edit-indigency" 
+                                            data-id="<?= $indigency['id'] ?>" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editIndigencyModal" 
+                                            title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <?php endif; ?>
                                     <?php if (checkUserPermission('delete_indigency')): ?>
-                                    <button class="btn btn-sm btn-danger delete-indigency" data-id="<?= $indigency['id'] ?>" data-bs-toggle="modal" data-bs-target="#deleteIndigencyModal" title="Delete">
+                                    <button class="btn btn-sm btn-danger delete-indigency" 
+                                            data-id="<?= $indigency['id'] ?>" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#deleteIndigencyModal" 
+                                            title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                     <?php endif; ?>
@@ -240,10 +270,6 @@ while ($row = $result->fetch_assoc()) {
                         <div class="mb-3">
                             <label for="purpose" class="form-label">Purpose</label>
                             <input type="text" class="form-control" name="purpose" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="issue_date" class="form-label">Issue Date</label>
-                            <input type="date" class="form-control" name="issue_date" required>
                         </div>
                         <div class="mb-3">
                             <label for="or_number" class="form-label">OR Number</label>
@@ -286,21 +312,17 @@ while ($row = $result->fetch_assoc()) {
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label>Issue Date</label>
-                                <input type="date" name="issue_date" id="edit_issue_date" class="form-control" required>
-                            </div>
-                            <div class="col-md-6">
                                 <label>OR Number</label>
                                 <input type="text" name="or_number" id="edit_or_number" class="form-control" required>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label>Status</label>
-                            <select name="status" id="edit_status" class="form-control" required>
-                                <option value="Pending">Pending</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
-                            </select>
+                            <div class="col-md-6">
+                                <label>Status</label>
+                                <select name="status" id="edit_status" class="form-control" required>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Rejected">Rejected</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -483,6 +505,40 @@ while ($row = $result->fetch_assoc()) {
             $('.modal').on('hidden.bs.modal', function() {
                 $(this).find('form').trigger('reset');
                 $(this).find('.select2').val('').trigger('change');
+            });
+
+            // Edit Indigency
+            $('.edit-indigency').click(function() {
+                var id = $(this).data('id');
+                var row = $(this).closest('tr');
+                
+                // Get data from the table row (updated indices)
+                var resident_name = row.find('td:eq(0)').text();
+                var purpose = row.find('td:eq(1)').text();
+                var or_number = row.find('td:eq(4)').text();  // Updated index
+                var status = row.find('td:eq(5)').text().trim();  // Updated index
+                
+                // Set the values in the edit modal
+                $('#edit_indigency_id').val(id);
+                
+                // Find and select the resident in the dropdown
+                var $residentSelect = $('#edit_resident_id');
+                $residentSelect.find('option').each(function() {
+                    if ($(this).text().trim() === resident_name.trim()) {
+                        $residentSelect.val($(this).val());
+                        return false;
+                    }
+                });
+                
+                $('#edit_purpose').val(purpose);
+                $('#edit_or_number').val(or_number);
+                $('#edit_status').val(status);
+            });
+
+            // Delete Indigency
+            $('.delete-indigency').click(function() {
+                var id = $(this).data('id');
+                $('#delete_indigency_id').val(id);
             });
         });
     </script>

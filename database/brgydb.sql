@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 26, 2024 at 03:57 AM
+-- Generation Time: Dec 28, 2024 at 01:53 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -79,10 +79,7 @@ CREATE TABLE `clearances` (
 INSERT INTO `clearances` (`id`, `resident_id`, `purpose`, `issue_date`, `expiry_date`, `or_number`, `amount`, `status`) VALUES
 (1, 1, 'test', '2024-11-29', '2025-05-29', '05468406810350', 1.00, 'Approved'),
 (3, 5, 'na', '2024-12-04', '2024-12-04', '78', 90.00, 'Approved'),
-(4, 8, 'PWD Sunong Dunong', '2024-12-05', '2024-12-26', '901827121023', 90.00, 'Pending'),
-(5, 6, 'Sunong Dunong', '2024-12-10', '2024-12-27', '09123182310293', 90.00, 'Pending'),
-(6, 7, '12312', '2024-12-19', '2024-12-27', '312312', 21.00, 'Pending'),
-(7, 5, 'Sunong Dunong', '2003-06-12', '2024-12-31', '9012102019109120912', 90.00, 'Pending');
+(11, 8, 'Sunong Dunong', '2024-12-28', '2025-12-28', '912312', 90.00, 'Approved');
 
 -- --------------------------------------------------------
 
@@ -117,6 +114,7 @@ CREATE TABLE `indigency` (
   `resident_id` int(11) DEFAULT NULL,
   `purpose` text NOT NULL,
   `issue_date` date NOT NULL,
+  `expiry_date` date DEFAULT NULL,
   `or_number` varchar(50) DEFAULT NULL,
   `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -125,11 +123,8 @@ CREATE TABLE `indigency` (
 -- Dumping data for table `indigency`
 --
 
-INSERT INTO `indigency` (`id`, `resident_id`, `purpose`, `issue_date`, `or_number`, `status`) VALUES
-(1, 1, 'test9', '2024-11-29', '3510346385', 'Approved'),
-(2, 2, 'Sunong Dunong', '2001-07-26', '091830918230182', 'Pending'),
-(3, 6, '3123', '2024-12-05', '3123123', 'Pending'),
-(4, 6, 'hukbubkj', '2024-12-12', '798798797', 'Pending');
+INSERT INTO `indigency` (`id`, `resident_id`, `purpose`, `issue_date`, `expiry_date`, `or_number`, `status`) VALUES
+(5, 4, 'req', '2024-12-28', '2025-06-28', '123123123', 'Approved');
 
 -- --------------------------------------------------------
 
@@ -289,7 +284,7 @@ ALTER TABLE `blotter`
 -- AUTO_INCREMENT for table `clearances`
 --
 ALTER TABLE `clearances`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `households`
@@ -301,7 +296,7 @@ ALTER TABLE `households`
 -- AUTO_INCREMENT for table `indigency`
 --
 ALTER TABLE `indigency`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `officials`
